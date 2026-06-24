@@ -1,0 +1,933 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTH & RBAC
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  phone         String?
+  isActive      Boolean   @default(true)
+  roleId        String
+  role          Role      @relation(fields: [roleId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  assignedClients  Client[]        @relation("AssignedClients")
+  createdClients   Client[]        @relation("CreatedClients")
+  createdInvoices  Invoice[]
+  assignedTasks    Task[]          @relation("AssignedTasks")
+  createdTasks     Task[]          @relation("CreatedTasks")
+  taskComments     TaskComment[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  calls            Call[]
+  messages         Message[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  displayName String
+  description String?
+  permissions Permission[]
+  users       User[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  action      String
+  resource    String
+  description String?
+  roles       Role[]
+  createdAt   DateTime @default(now())
+
+  @@unique([action, resource])
+  @@map("permissions")
+}
+
+// ============================================================
+// CRM MODULE
+// ============================================================
+
+model ClientSegment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#6366f1")
+  clients     Client[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("client_segments")
+}
+
+model Client {
+  id           String       @id @default(cuid())
+  name         String
+  company      String?
+  email        String?
+  phone        String
+  phone2       String?
+  address      String?
+  region       String?
+  status       ClientStatus @default(PROSPECT)
+  segmentId    String?
+  segment      ClientSegment? @relation(fields: [segmentId], references: [id])
+  assignedToId String?
+  assignedTo   User?        @relation("AssignedClients", fields: [assignedToId], references: [id])
+  createdById  String
+  createdBy    User         @relation("CreatedClients", fields: [createdById], references: [id])
+  notes        String?
+  telegramId   String?
+  tags         String[]
+  lastActivity DateTime?
+  reactivationAt DateTime?
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  invoices      Invoice[]
+  debts         Debt[]
+  tasks         Task[]
+  calls         Call[]
+  debtReminders DebtReminder[]
+  messages      Message[]
+  telegramLogs  TelegramLog[]
+  smsLogs       SMSLog[]
+  funnelEntries FunnelEntry[]
+  leadSource    LeadSource?   @relation(fields: [leadSourceId], references: [id])
+  leadSourceId  String?
+
+  @@index([status])
+  @@index([phone])
+  @@index([assignedToId])
+  @@map("clients")
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  LOST
+  DEBTOR
+  PROSPECT
+  COMPETITOR
+  RISK
+}
+
+// ============================================================
+// SALES MODULE
+// ============================================================
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  image       String?
+  parentId    String?
+  parent      ProductCategory?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    ProductCategory[] @relation("CategoryChildren")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("product_categories")
+}
+
+model Product {
+  id           String          @id @default(cuid())
+  name         String
+  sku          String          @unique
+  description  String?
+  price        Decimal         @db.Decimal(12, 2)
+  costPrice    Decimal?        @db.Decimal(12, 2)
+  stock        Int             @default(0)
+  unit         String          @default("dona")
+  categoryId   String?
+  category     ProductCategory? @relation(fields: [categoryId], references: [id])
+  isActive     Boolean         @default(true)
+  images       String[]
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  invoiceItems InvoiceItem[]
+  websiteProduct WebsiteProduct?
+
+  @@map("products")
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id])
+  status       InvoiceStatus @default(DRAFT)
+  subtotal     Decimal       @db.Decimal(12, 2)
+  discount     Decimal       @default(0) @db.Decimal(12, 2)
+  tax          Decimal       @default(0) @db.Decimal(12, 2)
+  total        Decimal       @db.Decimal(12, 2)
+  paid         Decimal       @default(0) @db.Decimal(12, 2)
+  dueDate      DateTime?
+  paidAt       DateTime?
+  notes        String?
+  createdById  String
+  createdBy    User          @relation(fields: [createdById], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+  debt     Debt?
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  name        String
+  description String?
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  discount    Decimal  @default(0) @db.Decimal(12, 2)
+  total       Decimal  @db.Decimal(12, 2)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  invoiceId String
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id])
+  amount    Decimal       @db.Decimal(12, 2)
+  method    PaymentMethod
+  reference String?
+  notes     String?
+  paidAt    DateTime      @default(now())
+  createdAt DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CRYPTO
+  OTHER
+}
+
+model Debt {
+  id           String       @id @default(cuid())
+  clientId     String
+  client       Client       @relation(fields: [clientId], references: [id])
+  invoiceId    String?      @unique
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  amount       Decimal      @db.Decimal(12, 2)
+  paidAmount   Decimal      @default(0) @db.Decimal(12, 2)
+  dueDate      DateTime
+  status       DebtStatus   @default(PENDING)
+  installments DebtInstallment[]
+  reminders    DebtReminder[]
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("debts")
+}
+
+enum DebtStatus {
+  PENDING
+  PARTIAL
+  OVERDUE
+  PAID
+  WRITTEN_OFF
+}
+
+model DebtInstallment {
+  id        String   @id @default(cuid())
+  debtId    String
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(12, 2)
+  dueDate   DateTime
+  paidAt    DateTime?
+  isPaid    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("debt_installments")
+}
+
+model DebtReminder {
+  id        String           @id @default(cuid())
+  debtId    String
+  debt      Debt             @relation(fields: [debtId], references: [id])
+  clientId  String
+  client    Client           @relation(fields: [clientId], references: [id])
+  type      ReminderType
+  status    ReminderStatus   @default(PENDING)
+  message   String?
+  sentAt    DateTime?
+  response  String?
+  createdAt DateTime         @default(now())
+
+  @@map("debt_reminders")
+}
+
+enum ReminderType {
+  SMS
+  TELEGRAM
+  AI_CALL
+  EMAIL
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  RESPONDED
+}
+
+// ============================================================
+// AI CALLS MODULE
+// ============================================================
+
+model Call {
+  id           String     @id @default(cuid())
+  clientId     String
+  client       Client     @relation(fields: [clientId], references: [id])
+  initiatedById String
+  initiatedBy  User       @relation(fields: [initiatedById], references: [id])
+  purpose      CallPurpose
+  status       CallStatus @default(PENDING)
+  phone        String
+  duration     Int?
+  script       String?
+  audioUrl     String?
+  attempt      Int        @default(1)
+  maxAttempts  Int        @default(3)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  error        String?
+  jobId        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  logs        CallLog[]
+  transcripts CallTranscript[]
+
+  @@index([clientId])
+  @@index([status])
+  @@map("calls")
+}
+
+enum CallPurpose {
+  DEBT_REMINDER
+  REACTIVATION
+  OFFER
+  FOLLOW_UP
+  SURVEY
+}
+
+enum CallStatus {
+  PENDING
+  DIALING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NO_ANSWER
+  BUSY
+  CANCELLED
+}
+
+model CallLog {
+  id        String   @id @default(cuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  event     String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@map("call_logs")
+}
+
+model CallTranscript {
+  id         String   @id @default(cuid())
+  callId     String
+  call       Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  speaker    String
+  text       String
+  confidence Float?
+  startTime  Float?
+  endTime    Float?
+  createdAt  DateTime @default(now())
+
+  @@map("call_transcripts")
+}
+
+// ============================================================
+// MESSAGING MODULE
+// ============================================================
+
+model Message {
+  id          String        @id @default(cuid())
+  clientId    String?
+  client      Client?       @relation(fields: [clientId], references: [id])
+  sentById    String
+  sentBy      User          @relation(fields: [sentById], references: [id])
+  type        MessageType
+  channel     MessageChannel
+  to          String
+  subject     String?
+  body        String
+  status      MessageStatus @default(PENDING)
+  sentAt      DateTime?
+  error       String?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+
+  @@index([clientId])
+  @@index([type])
+  @@map("messages")
+}
+
+enum MessageType {
+  REMINDER
+  OFFER
+  NOTIFICATION
+  CAMPAIGN
+  REPLY
+}
+
+enum MessageChannel {
+  TELEGRAM
+  SMS
+  EMAIL
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+model TelegramLog {
+  id         String   @id @default(cuid())
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id])
+  chatId     String
+  messageId  String?
+  direction  String
+  text       String
+  isBot      Boolean  @default(false)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@map("telegram_logs")
+}
+
+model SMSLog {
+  id         String   @id @default(cuid())
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id])
+  phone      String
+  message    String
+  status     String
+  provider   String?
+  externalId String?
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("sms_logs")
+}
+
+// ============================================================
+// TASK MANAGEMENT
+// ============================================================
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  assignedToId String?
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdById  String
+  createdBy    User         @relation("CreatedTasks", fields: [createdById], references: [id])
+  clientId     String?
+  client       Client?      @relation(fields: [clientId], references: [id])
+  dueDate      DateTime?
+  completedAt  DateTime?
+  parentId     String?
+  parent       Task?        @relation("SubTasks", fields: [parentId], references: [id])
+  subtasks     Task[]       @relation("SubTasks")
+  tags         String[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  comments TaskComment[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_comments")
+}
+
+// ============================================================
+// MARKETING & SOCIAL
+// ============================================================
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  type        CampaignType
+  status      CampaignStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?       @db.Decimal(12, 2)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  posts MarketingPost[]
+
+  @@map("campaigns")
+}
+
+enum CampaignType {
+  REACTIVATION
+  DEBT_RECOVERY
+  PRODUCT_LAUNCH
+  SEASONAL
+  LOYALTY
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model MarketingPost {
+  id           String    @id @default(cuid())
+  campaignId   String?
+  campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  platform     Platform
+  externalId   String?
+  title        String?
+  content      String
+  mediaUrls    String[]
+  isPublished  Boolean   @default(false)
+  publishedAt  DateTime?
+  likes        Int       @default(0)
+  comments     Int       @default(0)
+  shares       Int       @default(0)
+  reach        Int       @default(0)
+  impressions  Int       @default(0)
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  postComments MarketingComment[]
+
+  @@map("marketing_posts")
+}
+
+enum Platform {
+  INSTAGRAM
+  TELEGRAM
+  FACEBOOK
+  TIKTOK
+  WEBSITE
+}
+
+model MarketingComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      MarketingPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform  Platform
+  externalId String?
+  authorName String?
+  authorId   String?
+  text       String
+  sentiment  Sentiment?
+  aiReply    String?
+  isReplied  Boolean   @default(false)
+  repliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("marketing_comments")
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+model SocialMessage {
+  id         String   @id @default(cuid())
+  platform   Platform
+  externalId String?
+  fromId     String?
+  fromName   String?
+  text       String
+  aiReply    String?
+  isReplied  Boolean  @default(false)
+  repliedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@map("social_messages")
+}
+
+model SocialAnalytics {
+  id           String   @id @default(cuid())
+  platform     Platform
+  date         DateTime @db.Date
+  followers    Int      @default(0)
+  reach        Int      @default(0)
+  impressions  Int      @default(0)
+  engagement   Float    @default(0)
+  posts        Int      @default(0)
+  comments     Int      @default(0)
+  shares       Int      @default(0)
+  clicks       Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([platform, date])
+  @@map("social_analytics")
+}
+
+// ============================================================
+// LEAD MANAGEMENT & FUNNELS
+// ============================================================
+
+model LeadSource {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  channel     String?
+  clients     Client[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("lead_sources")
+}
+
+model Funnel {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  stages      FunnelStage[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("funnels")
+}
+
+model FunnelStage {
+  id       String        @id @default(cuid())
+  funnelId String
+  funnel   Funnel        @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  name     String
+  order    Int
+  color    String?
+  entries  FunnelEntry[]
+
+  @@map("funnel_stages")
+}
+
+model FunnelEntry {
+  id        String      @id @default(cuid())
+  stageId   String
+  stage     FunnelStage @relation(fields: [stageId], references: [id])
+  clientId  String
+  client    Client      @relation(fields: [clientId], references: [id])
+  enteredAt DateTime    @default(now())
+  exitedAt  DateTime?
+  notes     String?
+
+  @@map("funnel_entries")
+}
+
+// ============================================================
+// WEBSITE MODULE
+// ============================================================
+
+model WebsiteProduct {
+  id           String   @id @default(cuid())
+  productId    String   @unique
+  product      Product  @relation(fields: [productId], references: [id])
+  isPublished  Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  seoTitle     String?
+  seoDesc      String?
+  seoKeywords  String[]
+  websitePrice Decimal? @db.Decimal(12, 2)
+  order        Int      @default(0)
+  syncedAt     DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("website_products")
+}
+
+model WebsiteBanner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  imageUrl    String
+  linkUrl     String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("website_banners")
+}
+
+model WebsiteBonus {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String
+  value       Decimal  @db.Decimal(10, 2)
+  minOrder    Decimal? @db.Decimal(12, 2)
+  isActive    Boolean  @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("website_bonuses")
+}
+
+model WebsiteDiscount {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  type        String
+  value       Decimal  @db.Decimal(10, 2)
+  minOrder    Decimal? @db.Decimal(12, 2)
+  usageLimit  Int?
+  usedCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("website_discounts")
+}
+
+// ============================================================
+// ANALYTICS & REPORTS
+// ============================================================
+
+model AnalyticsReport {
+  id        String     @id @default(cuid())
+  type      ReportType
+  period    String
+  startDate DateTime
+  endDate   DateTime
+  data      Json
+  createdAt DateTime   @default(now())
+
+  @@index([type, period])
+  @@map("analytics_reports")
+}
+
+enum ReportType {
+  DAILY_SALES
+  WEEKLY_SALES
+  MONTHLY_SALES
+  YEARLY_SALES
+  CLIENT_RETENTION
+  DEBT_RECOVERY
+  LEAD_PERFORMANCE
+  PRODUCT_PERFORMANCE
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  OVERDUE_DEBT
+  NEW_LEAD
+  LOST_CLIENT
+  LOW_STOCK
+  TASK_ASSIGNED
+  TASK_DUE
+  CALL_COMPLETED
+  MESSAGE_RECEIVED
+  SYSTEM
+}
+
+// ============================================================
+// AUDIT LOGS & SETTINGS
+// ============================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  group     String   @default("general")
+  isPublic  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

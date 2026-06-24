@@ -3,6 +3,16 @@
 # dependencies
 /node_modules
 /.pnp
+
+# Sensitive
+.env
+.env.local
+.env.production
+nginx/ssl/
+uploads/
+
+# PM2
+.pm2/
 .pnp.*
 .yarn/*
 !.yarn/patches
