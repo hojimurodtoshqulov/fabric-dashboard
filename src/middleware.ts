@@ -1,28 +1,46 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ROLE_PERMISSIONS } from "@/constants";
 import type { Permission, RoleName } from "@/constants";
 
+// Lightweight NextAuth instance for Edge — no Prisma, no bcrypt
+const { auth } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login", error: "/login" },
+  callbacks: {
+    session({ session, token }) {
+      session.user.id = (token.id ?? token.sub ?? "") as string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (session.user as any).role = (token.role ?? "") as string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (session.user as any).permissions = (token.permissions ?? []) as string[];
+      return session;
+    },
+  },
+  providers: [],
+});
+
 const PUBLIC_ROUTES = ["/login", "/api/auth"];
 const API_PREFIX = "/api";
 
 const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
-  "/api/clients": ["clients:read"],
-  "/api/invoices": ["sales:read"],
-  "/api/payments": ["sales:read"],
-  "/api/debts": ["sales:read"],
-  "/api/calls": ["calls:read"],
-  "/api/messages": ["messages:read"],
+  "/api/clients":   ["clients:read"],
+  "/api/invoices":  ["sales:read"],
+  "/api/payments":  ["sales:read"],
+  "/api/debts":     ["sales:read"],
+  "/api/calls":     ["calls:read"],
+  "/api/messages":  ["messages:read"],
   "/api/analytics": ["analytics:read"],
   "/api/marketing": ["marketing:read"],
-  "/api/website": ["website:read"],
-  "/api/tasks": ["tasks:read"],
-  "/api/settings": ["settings:read"],
-  "/api/users": ["users:read"],
+  "/api/website":   ["website:read"],
+  "/api/tasks":     ["tasks:read"],
+  "/api/settings":  ["settings:read"],
+  "/api/users":     ["users:read"],
 };
 
-export default auth(async (req: NextRequest & { auth: { user?: { id: string; role: RoleName } } | null }) => {
+export default auth(async (req: NextRequest & { auth: { user?: { id: string; role: string; permissions?: string[] } } | null }) => {
   const { pathname } = req.nextUrl;
 
   const isPublic = PUBLIC_ROUTES.some(
@@ -48,7 +66,6 @@ export default auth(async (req: NextRequest & { auth: { user?: { id: string; rol
   if (matchedRoute) {
     const required = ROUTE_PERMISSIONS[matchedRoute];
     const hasAccess = required.some((p) => userPerms.includes(p as Permission));
-
     if (!hasAccess) {
       if (pathname.startsWith(API_PREFIX)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
