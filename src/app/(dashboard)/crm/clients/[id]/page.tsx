@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { ClientDetailView } from "@/components/crm/client-detail-view";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ id: string }>;
 }
