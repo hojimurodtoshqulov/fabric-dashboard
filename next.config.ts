@@ -1,13 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "prisma", "bcryptjs"],
-  },
+  serverExternalPackages: ["@prisma/client", "prisma", "bcryptjs"],
   images: {
-    domains: ["localhost"],
-    formats: ["image/webp"],
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
   async headers() {
     return [
