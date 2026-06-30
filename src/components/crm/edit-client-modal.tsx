@@ -92,6 +92,8 @@ export function EditClientModal({ client, open, onOpenChange }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client-regions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-districts"] });
       onOpenChange(false);
     },
     onError: (e: Error) => setError(e.message),
@@ -106,6 +108,8 @@ export function EditClientModal({ client, open, onOpenChange }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client-regions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-districts"] });
       onOpenChange(false);
     },
     onError: (e: Error) => setError(e.message),

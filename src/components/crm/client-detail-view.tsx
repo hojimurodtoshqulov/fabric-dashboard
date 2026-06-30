@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ interface Props {
 }
 
 export function ClientDetailView({ client, invoices, calls, tasks, debts }: Props) {
+  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
 
   const totalDebt = debts
@@ -92,8 +94,8 @@ export function ClientDetailView({ client, invoices, calls, tasks, debts }: Prop
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" asChild className="text-slate-400 hover:text-white mt-1">
-          <Link href="/crm/clients"><ArrowLeft className="h-5 w-5" /></Link>
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-slate-400 hover:text-white mt-1">
+          <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">

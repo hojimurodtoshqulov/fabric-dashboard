@@ -131,6 +131,7 @@ model Client {
   phone2       String?
   address      String?
   region       String?
+  province     String?
   status       ClientStatus @default(PROSPECT)
   segmentId    String?
   segment      ClientSegment? @relation(fields: [segmentId], references: [id])
@@ -162,6 +163,7 @@ model Client {
 
   @@index([status])
   @@index([phone])
+  @@index([province])
   @@index([assignedToId])
   @@map("clients")
 }

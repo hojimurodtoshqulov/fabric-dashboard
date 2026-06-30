@@ -5,8 +5,11 @@ import type { ClientStatus } from "@/constants";
 import type { PaginationParams } from "@/types";
 
 export class ClientService {
-  async list(params: PaginationParams & { status?: ClientStatus; segmentId?: string }) {
-    const { page = 1, limit = 20, search, status, segmentId, sortBy = "createdAt", sortOrder = "desc" } = params;
+  async list(params: PaginationParams & {
+    status?: ClientStatus; segmentId?: string;
+    region?: string; provinceWhere?: Record<string, unknown>;
+  }) {
+    const { page = 1, limit = 20, search, status, segmentId, region, provinceWhere, sortBy = "createdAt", sortOrder = "desc" } = params;
     const skip = (page - 1) * limit;
 
     const where = {
@@ -20,6 +23,8 @@ export class ClientService {
       }),
       ...(status && { status }),
       ...(segmentId && { segmentId }),
+      ...(region && { region }),
+      ...(provinceWhere ?? {}),
     };
 
     const [clients, total] = await Promise.all([
@@ -71,6 +76,7 @@ export class ClientService {
     email?: string;
     address?: string;
     region?: string;
+    province?: string;
     status?: ClientStatus;
     segmentId?: string;
     assignedToId?: string;
@@ -79,9 +85,10 @@ export class ClientService {
     tags?: string[];
     createdById: string;
   }) {
+    const { province, ...rest } = data;
     const client = await db.client.create({
       data: {
-        ...data,
+        ...rest,
         lastActivity: new Date(),
       },
       include: {
@@ -89,6 +96,10 @@ export class ClientService {
         assignedTo: { select: { id: true, name: true } },
       },
     });
+    // province raw SQL bilan saqlaymiz (Prisma client hali bilmaydi)
+    if (province) {
+      await db.$executeRaw`UPDATE clients SET province = ${province} WHERE id = ${client.id}`;
+    }
     return client;
   }
 

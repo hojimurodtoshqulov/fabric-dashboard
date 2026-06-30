@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/auth/server";
 import { db } from "@/lib/db";
+import type { ClientStatus } from "@prisma/client";
 
 interface ClientRow {
   name: string;
@@ -10,6 +11,12 @@ interface ClientRow {
   region?: string;
   status?: string;
   notes?: string;
+  _rowNum?: number;
+}
+
+interface ImportBody {
+  rows: ClientRow[];
+  province?: string;
 }
 
 const VALID_STATUSES = new Set(["ACTIVE", "INACTIVE", "LOST", "DEBTOR", "PROSPECT", "COMPETITOR", "RISK"]);
@@ -17,7 +24,7 @@ const VALID_STATUSES = new Set(["ACTIVE", "INACTIVE", "LOST", "DEBTOR", "PROSPEC
 export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission("clients:create");
-    const body = await req.json() as { rows: ClientRow[] };
+    const body = await req.json() as ImportBody;
 
     if (!Array.isArray(body.rows) || body.rows.length === 0) {
       return NextResponse.json({ error: "Bo'sh ma'lumot" }, { status: 400 });
@@ -26,65 +33,107 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Maksimum 1000 ta qator" }, { status: 400 });
     }
 
-    const errors: Array<{ row: number; message: string }> = [];
-    const valid: ClientRow[] = [];
+    const now = Date.now();
+    const prepared = body.rows.map((row, i) => {
+      const rowNum = row._rowNum ?? i + 2;
+      const hasName  = !!row.name?.trim();
+      const hasPhone = !!row.phone?.trim();
 
-    for (let i = 0; i < body.rows.length; i++) {
-      const row = body.rows[i];
-      if (!row.name?.trim()) { errors.push({ row: i + 2, message: "Ism bo'sh" }); continue; }
-      if (!row.phone?.trim()) { errors.push({ row: i + 2, message: "Telefon bo'sh" }); continue; }
-      if (row.status && !VALID_STATUSES.has(row.status.toUpperCase())) {
-        row.status = "ACTIVE";
-      }
-      valid.push({
-        name: row.name.trim(),
-        phone: row.phone.trim(),
+      const name  = hasName  ? row.name.trim()  : "Noma'lum";
+      const phone = hasPhone ? row.phone.trim()  : `NOPHONE_${now}_${rowNum}`;
+
+      const status: ClientStatus = (!hasName || !hasPhone)
+        ? "INACTIVE"
+        : VALID_STATUSES.has((row.status ?? "").toUpperCase())
+          ? (row.status!.toUpperCase() as ClientStatus)
+          : "ACTIVE";
+
+      const errorNote = !hasName && !hasPhone
+        ? "Import xatosi: ism va telefon yo'q"
+        : !hasName  ? "Import xatosi: ism ko'rsatilmagan"
+        : !hasPhone ? "Import xatosi: telefon ko'rsatilmagan"
+        : undefined;
+
+      const region  = row.region?.trim() || undefined;
+      const notes   = errorNote
+        ? [errorNote, row.notes?.trim()].filter(Boolean).join(" | ")
+        : row.notes?.trim() || undefined;
+
+      return { name, phone, region, status, notes,
         company: row.company?.trim() || undefined,
-        email: row.email?.trim() || undefined,
-        region: row.region?.trim() || undefined,
-        status: row.status?.toUpperCase() || "ACTIVE",
-        notes: row.notes?.trim() || undefined,
+        email:   row.email?.trim()   || undefined };
+    });
+    const importProvince = body.province;
+
+    // NOPHONE_* larni ajratamiz — bular har doim qo'shiladi
+    const noPhoneRows  = prepared.filter(r => r.phone.startsWith("NOPHONE_"));
+    const realRows     = prepared.filter(r => !r.phone.startsWith("NOPHONE_"));
+    const realPhones   = realRows.map(r => r.phone);
+
+    // Bazada mavjud telefonlarni topamiz
+    const existingMap = new Map<string, string>(); // phone → id
+    if (realPhones.length > 0) {
+      const found = await db.client.findMany({
+        where: { phone: { in: realPhones } },
+        select: { id: true, phone: true },
       });
+      for (const c of found) existingMap.set(c.phone, c.id);
     }
 
-    if (valid.length === 0) {
-      return NextResponse.json({ error: "Yaroqli qatorlar topilmadi", errors }, { status: 400 });
-    }
+    const toInsert = realRows.filter(r => !existingMap.has(r.phone));
+    // Mavjud telefonli mijozlar: agar region bor bo'lsa — yangilaymiz
+    const toUpdate  = realRows.filter(r => existingMap.has(r.phone) && r.region);
 
-    // Batch insert — skip duplicates by phone
-    const existingPhones = new Set(
-      (await db.client.findMany({
-        where: { phone: { in: valid.map(r => r.phone) } },
-        select: { phone: true },
-      })).map(c => c.phone)
-    );
-
-    const toInsert = valid.filter(r => !existingPhones.has(r.phone));
-    const skipped = valid.length - toInsert.length;
-
+    // NOPHONE_ va yangi telefonlarni qo'shamiz
     let created = 0;
-    if (toInsert.length > 0) {
-      // createMany for performance
-      await db.client.createMany({
-        data: toInsert.map(r => ({
-          name: r.name,
-          phone: r.phone,
-          company: r.company,
-          email: r.email,
-          region: r.region,
-          status: (r.status || "ACTIVE") as import("@prisma/client").ClientStatus,
-          notes: r.notes,
+    const insertAll = [...noPhoneRows, ...toInsert];
+    if (insertAll.length > 0) {
+      const result = await db.client.createMany({
+        data: insertAll.map(r => ({
+          ...r,
           createdById: user.id,
           lastActivity: new Date(),
         })),
         skipDuplicates: true,
       });
-      created = toInsert.length;
+      created = result.count;
+      // Province raw SQL bilan yangilaymiz
+      if (importProvince) {
+        const insertedPhones = insertAll.map(r => r.phone);
+        await db.$executeRaw`
+          UPDATE clients SET province = ${importProvince}
+          WHERE phone = ANY(${insertedPhones}::text[]) AND province IS NULL
+        `;
+      }
     }
+
+    // Mavjud mijozlar region va province ni yangilaymiz
+    let updated = 0;
+    if (toUpdate.length > 0) {
+      await db.$transaction(
+        toUpdate.map(r =>
+          db.client.update({
+            where: { id: existingMap.get(r.phone)! },
+            data: { ...(r.region && { region: r.region }) },
+          })
+        )
+      );
+      // Province raw SQL bilan
+      if (importProvince && toUpdate.length > 0) {
+        const updateIds = toUpdate.map(r => existingMap.get(r.phone)!);
+        await db.$executeRaw`
+          UPDATE clients SET province = ${importProvince}
+          WHERE id = ANY(${updateIds}::text[])
+        `;
+      }
+      updated = toUpdate.length;
+    }
+
+    const skipped = realRows.filter(r => existingMap.has(r.phone) && !r.region).length;
 
     return NextResponse.json({
       success: true,
-      data: { created, skipped, errors, total: body.rows.length },
+      data: { created, updated, skipped, total: body.rows.length },
     });
   } catch (e) {
     console.error(e);

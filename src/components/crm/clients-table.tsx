@@ -38,18 +38,25 @@ type ClientRow = {
   _count: { invoices: number; tasks: number };
 };
 
-export function ClientsTable() {
+interface ClientsTableProps {
+  provinceKey?: string;
+  exactRegion?: string;
+}
+
+export function ClientsTable({ provinceKey, exactRegion }: ClientsTableProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [editClient, setEditClient] = useState<ClientData | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", page, search, status],
+    queryKey: ["clients", page, search, status, provinceKey, exactRegion],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (search) params.set("search", search);
       if (status !== "all") params.set("status", status);
+      if (exactRegion) params.set("region", exactRegion);
+      else if (provinceKey) params.set("province", provinceKey);
       const res = await fetch(`/api/clients?${params}`);
       const json = await res.json();
       return json.data as {
