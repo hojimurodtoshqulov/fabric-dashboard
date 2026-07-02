@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, MessageCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { ProvinceFilter } from "@/components/shared/province-filter";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   PENDING:   { label: "Kutilmoqda", className: "border-slate-700 text-slate-400" },
@@ -17,12 +18,14 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 
 export function MessagesPanel() {
   const [search, setSearch] = useState("");
+  const [province, setProvince] = useState("");
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["messages", "telegram", search],
+    queryKey: ["messages", "telegram", search, province],
     queryFn: async () => {
       const p = new URLSearchParams({ type: "TELEGRAM", limit: "50" });
       if (search) p.set("search", search);
+      if (province) p.set("province", province);
       const res = await fetch(`/api/messages?${p}`);
       const json = await res.json();
       return json.data as {
@@ -39,6 +42,12 @@ export function MessagesPanel() {
 
   return (
     <div className="space-y-4">
+      <ProvinceFilter
+        value={province}
+        onChange={setProvince}
+        statsUrl="/api/messages/province-stats"
+        countLabel="ta xabar"
+      />
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Jami xabarlar", value: data?.total ?? 0, color: "text-white" },

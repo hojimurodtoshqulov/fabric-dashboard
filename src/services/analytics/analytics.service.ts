@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getCache, setCache, CACHE_KEYS } from "@/lib/cache";
+import { PROVINCE_GROUPS } from "@/lib/provinces";
 import dayjs from "dayjs";
 
 export class AnalyticsService {
@@ -219,6 +220,43 @@ export class AnalyticsService {
         revenue,
       };
     });
+  }
+
+  async getProvinceStats() {
+    type RawRow = {
+      province: string;
+      client_count: bigint;
+      total_revenue: unknown;
+      total_paid: unknown;
+      overdue_debts: bigint;
+      overdue_amount: unknown;
+    };
+
+    const rows = await db.$queryRaw<RawRow[]>`
+      SELECT
+        c.province,
+        COUNT(DISTINCT c.id)::bigint AS client_count,
+        COALESCE(SUM(CASE WHEN i.status != 'CANCELLED' THEN i.total ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN i.status != 'CANCELLED' THEN i.paid  ELSE 0 END), 0) AS total_paid,
+        COUNT(DISTINCT CASE WHEN d.status = 'OVERDUE' THEN d.id END)::bigint AS overdue_debts,
+        COALESCE(SUM(CASE WHEN d.status = 'OVERDUE' THEN d.amount - d."paidAmount" ELSE 0 END), 0) AS overdue_amount
+      FROM clients c
+      LEFT JOIN invoices i ON i."clientId" = c.id
+      LEFT JOIN debts d ON d."clientId" = c.id
+      WHERE c.province IS NOT NULL
+      GROUP BY c.province
+      ORDER BY total_revenue DESC
+    `;
+
+    return rows.map((r) => ({
+      province: r.province,
+      label: PROVINCE_GROUPS.find((p) => p.key === r.province)?.label ?? r.province,
+      clientCount: Number(r.client_count),
+      totalRevenue: Number(r.total_revenue),
+      totalPaid: Number(r.total_paid),
+      overdueDebts: Number(r.overdue_debts),
+      overdueAmount: Number(r.overdue_amount),
+    }));
   }
 
   async getLeadSourcePerformance() {

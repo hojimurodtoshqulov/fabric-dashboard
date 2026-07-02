@@ -12,8 +12,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") as InvoiceStatus | null;
     const clientId = searchParams.get("clientId") || undefined;
+    const province = searchParams.get("province") || undefined;
 
-    const result = await invoiceService.list({ page, limit, search, ...(status && { status }), clientId });
+    const result = await invoiceService.list({ page, limit, search, ...(status && { status }), clientId, province });
     return apiSuccess(result);
   } catch (e) {
     return handleApiError(e);

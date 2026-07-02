@@ -44,7 +44,7 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <p className="text-white font-bold text-sm leading-tight">Fabric OS</p>
+            <p className="text-white font-bold text-sm leading-tight">Selxozmash</p>
             <p className="text-slate-500 text-xs">Boshqaruv</p>
           </div>
         )}

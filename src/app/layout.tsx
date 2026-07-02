@@ -7,8 +7,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Fabric Automation",
-    default: "Fabric Automation - Business OS",
+    template: "%s | Selxozmash",
+    default: "Selxozmash - Boshqaruv tizimi",
   },
   description: "Tibbiy paxta va bint fabrikasi boshqaruv tizimi",
 };

@@ -1,6 +1,6 @@
 export const config = {
   app: {
-    name: "Fabric Automation",
+    name: "Selxozmash",
     url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     secret: process.env.APP_SECRET!,
     isDev: process.env.NODE_ENV === "development",

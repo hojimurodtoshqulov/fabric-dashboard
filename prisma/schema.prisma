@@ -235,6 +235,8 @@ model Invoice {
   dueDate      DateTime?
   paidAt       DateTime?
   notes        String?
+  externalId   String?
+  source       String        @default("manual")
   createdById  String
   createdBy    User          @relation(fields: [createdById], references: [id])
   createdAt    DateTime      @default(now())

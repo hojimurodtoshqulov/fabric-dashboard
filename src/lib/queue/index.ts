@@ -72,3 +72,30 @@ export async function scheduleDebtReminder(
     console.warn("[Queue] scheduleDebtReminder failed:", e instanceof Error ? e.message : e);
   }
 }
+
+export async function setupScheduledTasks(): Promise<void> {
+  try {
+    const { Queue } = await import("bullmq");
+    const conn = getConnection();
+    if (!conn) { console.log("[Scheduler] Redis unavailable, skipping setup"); return; }
+
+    const q = new Queue("scheduled-tasks", { connection: conn });
+
+    const existing = await q.getRepeatableJobs();
+    const alreadyExists = existing.some((j) => j.name === "check-overdue-invoices");
+
+    if (!alreadyExists) {
+      // Har kecha soat 01:00 UTC = 06:00 UZT
+      await q.add("check-overdue-invoices", {}, {
+        repeat: { pattern: "0 1 * * *" },
+      });
+      console.log("[Scheduler] Registered: check-overdue-invoices (daily 01:00 UTC / 06:00 UZT)");
+    } else {
+      console.log("[Scheduler] Already registered: check-overdue-invoices");
+    }
+
+    await q.close();
+  } catch (e) {
+    console.warn("[Scheduler] setupScheduledTasks failed:", e instanceof Error ? e.message : e);
+  }
+}

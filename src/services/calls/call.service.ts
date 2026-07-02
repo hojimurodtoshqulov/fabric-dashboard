@@ -54,13 +54,15 @@ export class CallService {
     limit?: number;
     clientId?: string;
     status?: string;
+    province?: string;
   }) {
-    const { page = 1, limit = 20, clientId, status } = params;
+    const { page = 1, limit = 20, clientId, status, province } = params;
     const skip = (page - 1) * limit;
 
     const callWhere = {
       ...(clientId && { clientId }),
       ...(status && { status: status as import("@prisma/client").CallStatus }),
+      ...(province && { client: { province } }),
     };
 
     const [calls, total] = await Promise.all([

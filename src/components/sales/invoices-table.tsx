@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Eye } from "lucide-react";
 import Link from "next/link";
+import { ProvinceFilter } from "@/components/shared/province-filter";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   DRAFT:     { label: "Qoralama",    className: "border-slate-700 text-slate-400" },
@@ -21,14 +22,16 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 export function InvoicesTable() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [province, setProvince] = useState("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["invoices", page, search, status],
+    queryKey: ["invoices", page, search, status, province],
     queryFn: async () => {
       const p = new URLSearchParams({ page: String(page), limit: "20" });
       if (search) p.set("search", search);
       if (status !== "all") p.set("status", status);
+      if (province) p.set("province", province);
       const res = await fetch(`/api/invoices?${p}`);
       const json = await res.json();
       return json.data as {
@@ -47,6 +50,12 @@ export function InvoicesTable() {
 
   return (
     <div className="space-y-4">
+      <ProvinceFilter
+        value={province}
+        onChange={(v) => { setProvince(v); setPage(1); }}
+        statsUrl="/api/invoices/province-stats"
+        countLabel="ta faktura"
+      />
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />

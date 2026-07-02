@@ -11,13 +11,15 @@ export class InvoiceService {
     search?: string;
     status?: InvoiceStatus;
     clientId?: string;
+    province?: string;
   }) {
-    const { page = 1, limit = 20, search, status, clientId } = params;
+    const { page = 1, limit = 20, search, status, clientId, province } = params;
     const skip = (page - 1) * limit;
 
     const where = {
       ...(clientId && { clientId }),
       ...(status && { status }),
+      ...(province && { client: { province } }),
       ...(search && {
         OR: [
           { number: { contains: search } },
@@ -71,7 +73,7 @@ export class InvoiceService {
     }>;
     discount?: number;
     tax?: number;
-    dueDate?: Date;
+    dueDate?: Date | string;
     notes?: string;
   }) {
     const number = await this.generateInvoiceNumber();
@@ -96,9 +98,9 @@ export class InvoiceService {
         discount: data.discount || 0,
         tax: data.tax || 0,
         total,
-        dueDate: data.dueDate,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         notes: data.notes,
-        status: "DRAFT",
+        status: data.dueDate ? "SENT" : "DRAFT",
         items: {
           create: items,
         },
@@ -173,7 +175,7 @@ export class InvoiceService {
   async checkOverdueInvoices() {
     const overdueInvoices = await db.invoice.findMany({
       where: {
-        status: { in: ["SENT", "PARTIAL"] },
+        status: { in: ["DRAFT", "SENT", "PARTIAL"] },
         dueDate: { lt: new Date() },
       },
       include: {
@@ -209,8 +211,8 @@ export class InvoiceService {
         data: { status: "DEBTOR" },
       });
 
-      // Schedule AI call
-      await scheduleCall({
+      // Fire-and-forget: Redis bo'lmasa bloklanmasin
+      scheduleCall({
         callId: `overdue-${invoice.id}`,
         clientId: invoice.clientId,
         clientName: invoice.client.name,
@@ -222,14 +224,16 @@ export class InvoiceService {
         },
         attempt: 1,
         maxAttempts: 3,
-      });
+      }).catch((e) => console.warn("[checkOverdue] scheduleCall:", e?.message));
 
-      // Notify directors
-      emitToRole("DIRECTOR", "DEBT_ALERT", {
-        invoiceId: invoice.id,
-        clientName: invoice.client.name,
-        amount: Number(invoice.total) - Number(invoice.paid),
-      });
+      try {
+        emitToRole("DIRECTOR", "DEBT_ALERT", {
+          invoiceId: invoice.id,
+          clientName: invoice.client.name,
+          amount: Number(invoice.total) - Number(invoice.paid),
+        });
+      } catch {}
+
     }
 
     return overdueInvoices.length;

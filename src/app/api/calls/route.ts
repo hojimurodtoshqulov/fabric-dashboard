@@ -11,8 +11,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId") || undefined;
     const status = searchParams.get("status") || undefined;
+    const province = searchParams.get("province") || undefined;
 
-    const result = await callService.list({ page, limit, clientId, status });
+    const result = await callService.list({ page, limit, clientId, status, province });
     return apiSuccess(result);
   } catch (e) {
     return handleApiError(e);

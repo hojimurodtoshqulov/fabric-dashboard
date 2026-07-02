@@ -1,18 +1,19 @@
 import { Metadata } from "next";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { StatCard } from "@/components/shared/stat-card";
-import { BarChart3, TrendingUp, Users, CreditCard, MapPin, Award } from "lucide-react";
+import { BarChart3, TrendingUp, Users, CreditCard, MapPin, Award, Building2, AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Analitika" };
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage() {
-  const [clientStats, debtStats, topProducts, regionPerf, managerPerf] = await Promise.all([
+  const [clientStats, debtStats, topProducts, regionPerf, managerPerf, provinceStats] = await Promise.all([
     analyticsService.getClientStats(),
     analyticsService.getDebtStats(),
     analyticsService.getTopProducts(5),
     analyticsService.getRegionPerformance(),
     analyticsService.getManagerPerformance(),
+    analyticsService.getProvinceStats(),
   ]);
 
   return (
@@ -136,6 +137,70 @@ export default async function AnalyticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Province breakdown */}
+      {provinceStats.length > 0 && (
+        <div>
+          <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-indigo-400" />
+            Viloyatlar kesimida ko'rsatkichlar
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {provinceStats.map((stat) => (
+              <div key={stat.province} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white font-medium text-sm">{stat.label}</h3>
+                  <div className="flex items-center gap-1 text-slate-500 text-xs">
+                    <Building2 className="h-3 w-3" />
+                    {stat.clientCount} ta
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Daromad</span>
+                    <span className="text-green-400 font-medium">
+                      {stat.totalRevenue >= 1_000_000
+                        ? `${(stat.totalRevenue / 1_000_000).toFixed(1)}M`
+                        : `${Math.round(stat.totalRevenue / 1_000)}K`} so'm
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">To'langan</span>
+                    <span className="text-blue-400 font-medium">
+                      {stat.totalPaid >= 1_000_000
+                        ? `${(stat.totalPaid / 1_000_000).toFixed(1)}M`
+                        : `${Math.round(stat.totalPaid / 1_000)}K`} so'm
+                    </span>
+                  </div>
+                  {stat.overdueDebts > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 text-red-400" />
+                        Muddati o'tgan
+                      </span>
+                      <span className="text-red-400 font-medium">
+                        {stat.overdueAmount >= 1_000_000
+                          ? `${(stat.overdueAmount / 1_000_000).toFixed(1)}M`
+                          : `${Math.round(stat.overdueAmount / 1_000)}K`} so'm
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {stat.totalRevenue > 0 && (
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-600 rounded-full"
+                      style={{
+                        width: `${Math.min(100, (stat.totalPaid / stat.totalRevenue) * 100).toFixed(1)}%`,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

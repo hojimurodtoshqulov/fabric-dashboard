@@ -1,14 +1,16 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { ROLE_PERMISSIONS } from "@/constants";
 import type { Permission, RoleName } from "@/constants";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(db),
+  // Aniq ko'rsatish: NEXTAUTH_SECRET → AUTH_SECRET fallback
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+  // JWT strategiya bilan PrismaAdapter kerak emas — soddalik + xatolarni kamaytiradi
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
+  trustHost: true,
   pages: {
     signIn: "/login",
     error: "/login",
