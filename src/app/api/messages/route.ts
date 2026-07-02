@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/server";
 import { db } from "@/lib/db";
+import { MessageChannel, MessageType } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
   if (!content || !to) return NextResponse.json({ error: "Body and to required" }, { status: 400 });
 
   const message = await db.message.create({
-    data: { channel, type: msgType, body: content, clientId, to, sentById: user.id },
+    data: { channel: channel as MessageChannel, type: msgType as MessageType, body: content, clientId, to, sentById: user.id },
     include: {
       client: { select: { id: true, name: true } },
       sentBy: { select: { id: true, name: true } },
