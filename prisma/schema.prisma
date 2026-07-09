@@ -153,6 +153,7 @@ model Client {
   debts         Debt[]
   tasks         Task[]
   calls         Call[]
+  callResponses CallResponse[]
   debtReminders DebtReminder[]
   messages      Message[]
   telegramLogs  TelegramLog[]
@@ -377,34 +378,100 @@ enum ReminderStatus {
 // AI CALLS MODULE
 // ============================================================
 
+model VoiceTemplate {
+  id           String            @id @default(cuid())
+  name         String
+  type         VoiceTemplateType
+  title        String
+  description  String?
+  audioFileUrl String?
+  isActive     Boolean           @default(true)
+  dtmfConfig   Json?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  calls Call[]
+
+  @@map("voice_templates")
+}
+
 model Call {
-  id           String     @id @default(cuid())
-  clientId     String
-  client       Client     @relation(fields: [clientId], references: [id])
-  initiatedById String
-  initiatedBy  User       @relation(fields: [initiatedById], references: [id])
-  purpose      CallPurpose
-  status       CallStatus @default(PENDING)
-  phone        String
-  duration     Int?
-  script       String?
-  audioUrl     String?
-  attempt      Int        @default(1)
-  maxAttempts  Int        @default(3)
-  scheduledAt  DateTime?
-  startedAt    DateTime?
-  endedAt      DateTime?
-  error        String?
-  jobId        String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id              String      @id @default(cuid())
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id])
+  initiatedById   String
+  initiatedBy     User        @relation(fields: [initiatedById], references: [id])
+  purpose         CallPurpose
+  status          CallStatus  @default(PENDING)
+  callMode        CallMode    @default(TEMPLATE)
+  callResult      CallResultType?
+  voiceTemplateId String?
+  voiceTemplate   VoiceTemplate? @relation(fields: [voiceTemplateId], references: [id], onDelete: SetNull)
+  phone           String
+  duration        Int?
+  script          String?
+  audioUrl        String?
+  attempt         Int         @default(1)
+  maxAttempts     Int         @default(3)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  error           String?
+  jobId           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   logs        CallLog[]
   transcripts CallTranscript[]
+  responses   CallResponse[]
 
   @@index([clientId])
   @@index([status])
+  @@index([voiceTemplateId])
   @@map("calls")
+}
+
+model CallResponse {
+  id            String   @id @default(cuid())
+  callId        String
+  call          Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id])
+  responseKey   String
+  responseLabel String
+  createdAt     DateTime @default(now())
+
+  @@index([callId])
+  @@index([clientId])
+  @@map("call_responses")
+}
+
+enum VoiceTemplateType {
+  DEBT_DUE_SOON
+  DEBT_OVERDUE
+  PROSPECT_INTRO
+  LOST_CLIENT_REACTIVATION
+  NEW_CAMPAIGN
+  BONUS_OFFER
+  PAYMENT_CONFIRMATION
+  CUSTOM
+}
+
+enum CallMode {
+  TEMPLATE
+  AI_DYNAMIC
+  AI_CONVERSATION
+}
+
+enum CallResultType {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  PAYMENT_CONFIRMED
+  PROMISE_TO_PAY
+  INTERESTED
+  NOT_INTERESTED
+  CALLBACK_REQUESTED
 }
 
 enum CallPurpose {

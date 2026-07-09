@@ -8,6 +8,8 @@ export class CallService {
     purpose: CallPurpose;
     scheduledAt?: Date;
     initiatedById: string;
+    callMode?: "TEMPLATE" | "AI_DYNAMIC" | "AI_CONVERSATION";
+    voiceTemplateId?: string;
     context?: Record<string, unknown>;
   }) {
     const client = await db.client.findUnique({
@@ -16,35 +18,42 @@ export class CallService {
     });
     if (!client) throw new Error("NOT_FOUND");
 
+    const callMode = data.callMode ?? "AI_DYNAMIC";
+
     const call = await db.call.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         clientId: data.clientId,
         initiatedById: data.initiatedById,
         purpose: data.purpose,
+        callMode,
+        voiceTemplateId: data.voiceTemplateId ?? null,
         phone: client.phone,
         status: "PENDING",
         scheduledAt: data.scheduledAt,
         maxAttempts: 3,
-      },
+      } as any,
     });
 
-    const delay = data.scheduledAt
-      ? Math.max(0, data.scheduledAt.getTime() - Date.now())
-      : 0;
-
-    await scheduleCall(
-      {
-        callId: call.id,
-        clientId: client.id,
-        clientName: client.name,
-        clientPhone: client.phone,
-        purpose: data.purpose as string as "DEBT_REMINDER" | "REACTIVATION" | "OFFER" | "FOLLOW_UP",
-        context: data.context || {},
-        attempt: 1,
-        maxAttempts: 3,
-      },
-      delay
-    );
+    // For AI_DYNAMIC / AI_CONVERSATION — use existing AI worker
+    if (callMode !== "TEMPLATE") {
+      const delay = data.scheduledAt
+        ? Math.max(0, data.scheduledAt.getTime() - Date.now())
+        : 0;
+      await scheduleCall(
+        {
+          callId: call.id,
+          clientId: client.id,
+          clientName: client.name,
+          clientPhone: client.phone,
+          purpose: data.purpose as string as "DEBT_REMINDER" | "REACTIVATION" | "OFFER" | "FOLLOW_UP" | "SURVEY",
+          context: data.context || {},
+          attempt: 1,
+          maxAttempts: 3,
+        },
+        delay
+      );
+    }
 
     return call;
   }
@@ -86,12 +95,15 @@ export class CallService {
   async getById(id: string) {
     return db.call.findUnique({
       where: { id },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       include: {
-        client: { select: { id: true, name: true, phone: true } },
-        initiatedBy: { select: { id: true, name: true } },
-        logs: { orderBy: { createdAt: "asc" } },
-        transcripts: { orderBy: { createdAt: "asc" } },
-      },
+        client:        { select: { id: true, name: true, phone: true } },
+        initiatedBy:   { select: { id: true, name: true } },
+        logs:          { orderBy: { createdAt: "asc" } },
+        transcripts:   { orderBy: { createdAt: "asc" } },
+        voiceTemplate: { select: { id: true, name: true, type: true } },
+        responses:     { orderBy: { createdAt: "asc" } },
+      } as any,
     });
   }
 

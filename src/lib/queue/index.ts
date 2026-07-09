@@ -1,5 +1,5 @@
 import { config } from "@/config";
-import type { CallJobData, MessageJobData } from "@/types";
+import type { CallJobData, MessageJobData, TemplateCallJobData } from "@/types";
 
 // Lazy-load BullMQ only when Redis is available
 let _callsQueue: import("bullmq").Queue<CallJobData> | null = null;
@@ -73,6 +73,19 @@ export async function scheduleDebtReminder(
   }
 }
 
+export async function scheduleTemplateCall(data: TemplateCallJobData, delayMs = 0): Promise<void> {
+  try {
+    const { Queue } = await import("bullmq");
+    const conn = getConnection();
+    if (!conn) { console.log("[Queue] Redis unavailable, template call skipped:", data.callId); return; }
+    const q = new Queue<TemplateCallJobData>("template-calls", { connection: conn });
+    await q.add("template-call", data, { delay: delayMs, jobId: `tcall-${data.callId}` });
+    await q.close();
+  } catch (e) {
+    console.warn("[Queue] scheduleTemplateCall failed:", e instanceof Error ? e.message : e);
+  }
+}
+
 export async function setupScheduledTasks(): Promise<void> {
   try {
     const { Queue } = await import("bullmq");
@@ -92,6 +105,15 @@ export async function setupScheduledTasks(): Promise<void> {
       console.log("[Scheduler] Registered: check-overdue-invoices (daily 01:00 UTC / 06:00 UZT)");
     } else {
       console.log("[Scheduler] Already registered: check-overdue-invoices");
+    }
+
+    const hasAutomation = existing.some((j) => j.name === "run-call-automation");
+    if (!hasAutomation) {
+      // Har kuni soat 09:00 UZT (04:00 UTC)
+      await q.add("run-call-automation", {}, {
+        repeat: { pattern: "0 4 * * *" },
+      });
+      console.log("[Scheduler] Registered: run-call-automation (daily 09:00 UZT)");
     }
 
     await q.close();

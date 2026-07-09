@@ -32,6 +32,13 @@ export function startSchedulerWorker() {
         console.log(`[SchedulerWorker] Done: ${processed} ta faktura qayta ishlandi`);
         return { processed };
       }
+      if (job.name === "run-call-automation") {
+        console.log("[SchedulerWorker] Running: run-call-automation");
+        const { automationService } = await import("@/services/calls/automation.service");
+        const result = await automationService.runAllAutomations();
+        console.log("[SchedulerWorker] Automation done:", result);
+        return result;
+      }
     },
     { connection: conn, concurrency: 1 }
   );

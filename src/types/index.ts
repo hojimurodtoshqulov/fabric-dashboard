@@ -98,7 +98,7 @@ export interface CallJobData {
   clientId: string;
   clientName: string;
   clientPhone: string;
-  purpose: "DEBT_REMINDER" | "REACTIVATION" | "OFFER" | "FOLLOW_UP";
+  purpose: "DEBT_REMINDER" | "REACTIVATION" | "OFFER" | "FOLLOW_UP" | "SURVEY";
   context: {
     debtAmount?: number;
     dueDate?: string;
@@ -107,6 +107,37 @@ export interface CallJobData {
   };
   attempt: number;
   maxAttempts: number;
+}
+
+export interface TemplateCallJobData {
+  callId: string;
+  clientId: string;
+  clientName: string;
+  clientPhone: string;
+  purpose: string;
+  callMode: "TEMPLATE" | "AI_DYNAMIC" | "AI_CONVERSATION";
+  voiceTemplateId?: string;
+  audioFileUrl?: string;
+  dtmfConfig?: DtmfConfig | null;
+  context: {
+    debtAmount?: number;
+    dueDate?: string;
+    productName?: string;
+    lastInteraction?: string;
+  };
+  attempt: number;
+  maxAttempts: number;
+}
+
+export interface DtmfKey {
+  key: string;
+  label: string;
+  action?: "confirm_payment" | "promise_pay" | "callback" | "interested" | "not_interested" | "transfer_manager" | "custom";
+}
+
+export interface DtmfConfig {
+  keys: DtmfKey[];
+  timeout?: number;
 }
 
 // Message types

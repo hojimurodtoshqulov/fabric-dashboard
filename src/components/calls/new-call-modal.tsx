@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Phone, Search, X, Loader2 } from "lucide-react";
+import { Phone, Search, X, Loader2, Music } from "lucide-react";
+import { CALL_MODE_LABELS } from "@/constants";
 
 const PURPOSES = [
   { value: "DEBT_REMINDER", label: "Qarz eslatmasi" },
@@ -21,11 +22,17 @@ const PURPOSES = [
 ];
 
 interface ClientHit { id: string; name: string; phone: string }
+interface TemplateSummary { id: string; name: string; type: string }
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
+
+const CALL_MODES = [
+  { value: "TEMPLATE",   label: CALL_MODE_LABELS.TEMPLATE },
+  { value: "AI_DYNAMIC", label: CALL_MODE_LABELS.AI_DYNAMIC },
+];
 
 export function NewCallModal({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
@@ -33,7 +40,17 @@ export function NewCallModal({ open, onOpenChange }: Props) {
   const [selectedClient, setSelectedClient] = useState<ClientHit | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [purpose, setPurpose] = useState("DEBT_REMINDER");
+  const [callMode, setCallMode] = useState("TEMPLATE");
+  const [voiceTemplateId, setVoiceTemplateId] = useState("");
   const [error, setError] = useState("");
+
+  const { data: templatesData } = useQuery({
+    queryKey: ["voice-templates"],
+    queryFn: () => fetch("/api/voice-templates").then((r) => r.json()),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const templates: TemplateSummary[] = templatesData?.data?.templates?.filter((t: { isActive: boolean }) => t.isActive) ?? [];
 
   const { data: searchData } = useQuery({
     queryKey: ["call-client-search", clientSearch],
@@ -52,7 +69,12 @@ export function NewCallModal({ open, onOpenChange }: Props) {
       const res = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId: selectedClient.id, purpose }),
+        body: JSON.stringify({
+          clientId: selectedClient.id,
+          purpose,
+          callMode,
+          voiceTemplateId: callMode === "TEMPLATE" && voiceTemplateId ? voiceTemplateId : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Xatolik");
@@ -71,6 +93,8 @@ export function NewCallModal({ open, onOpenChange }: Props) {
     setSelectedClient(null);
     setShowDropdown(false);
     setPurpose("DEBT_REMINDER");
+    setCallMode("TEMPLATE");
+    setVoiceTemplateId("");
     setError("");
   }
 
@@ -132,6 +156,51 @@ export function NewCallModal({ open, onOpenChange }: Props) {
               )}
             </div>
           </div>
+
+          {/* Call mode */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-slate-400 uppercase tracking-wide block">
+              Rejim
+            </Label>
+            <Select value={callMode} onValueChange={setCallMode}>
+              <SelectTrigger className="bg-slate-800/60 border-slate-700 text-white h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700">
+                {CALL_MODES.map((m) => (
+                  <SelectItem key={m.value} value={m.value} className="text-white focus:bg-slate-700">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Template selector (only for TEMPLATE mode) */}
+          {callMode === "TEMPLATE" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Music className="w-3 h-3" /> Ovoz shabloni
+              </Label>
+              <Select value={voiceTemplateId} onValueChange={setVoiceTemplateId}>
+                <SelectTrigger className="bg-slate-800/60 border-slate-700 text-white h-10">
+                  <SelectValue placeholder="Shablon tanlang (ixtiyoriy)" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id} className="text-white focus:bg-slate-700">
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                  {templates.length === 0 && (
+                    <SelectItem value="none" disabled className="text-slate-500">
+                      Faol shablonlar yo'q
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Purpose */}
           <div className="space-y-1.5">

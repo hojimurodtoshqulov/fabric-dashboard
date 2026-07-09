@@ -60,11 +60,51 @@ export const NOTIFICATION_TYPES = {
 
 export const QUEUE_NAMES = {
   AI_CALLS: "ai-calls",
+  TEMPLATE_CALLS: "template-calls",
   MESSAGES: "messages",
   NOTIFICATIONS: "notifications",
   ANALYTICS: "analytics",
   DEBT_REMINDERS: "debt-reminders",
 } as const;
+
+export const VOICE_TEMPLATE_TYPES = {
+  DEBT_DUE_SOON:           "DEBT_DUE_SOON",
+  DEBT_OVERDUE:            "DEBT_OVERDUE",
+  PROSPECT_INTRO:          "PROSPECT_INTRO",
+  LOST_CLIENT_REACTIVATION:"LOST_CLIENT_REACTIVATION",
+  NEW_CAMPAIGN:            "NEW_CAMPAIGN",
+  BONUS_OFFER:             "BONUS_OFFER",
+  PAYMENT_CONFIRMATION:    "PAYMENT_CONFIRMATION",
+  CUSTOM:                  "CUSTOM",
+} as const;
+
+export const VOICE_TEMPLATE_LABELS: Record<string, string> = {
+  DEBT_DUE_SOON:            "Qarz muddati yaqinlashmoqda",
+  DEBT_OVERDUE:             "Qarz muddati o'tib ketgan",
+  PROSPECT_INTRO:           "Potensial mijoz tanishtiruvi",
+  LOST_CLIENT_REACTIVATION: "Yo'qotilgan mijozni qaytarish",
+  NEW_CAMPAIGN:             "Yangi kampaniya",
+  BONUS_OFFER:              "Bonus taklifi",
+  PAYMENT_CONFIRMATION:     "To'lov tasdiqi",
+  CUSTOM:                   "Maxsus shablon",
+};
+
+export const CALL_MODE_LABELS: Record<string, string> = {
+  TEMPLATE:        "Shablon",
+  AI_DYNAMIC:      "AI dinamik",
+  AI_CONVERSATION: "AI suhbat",
+};
+
+export const CALL_RESULT_LABELS: Record<string, string> = {
+  ANSWERED:           "Javob berdi",
+  NO_ANSWER:          "Javob bermadi",
+  BUSY:               "Band",
+  PAYMENT_CONFIRMED:  "To'lov tasdiqlandi",
+  PROMISE_TO_PAY:     "To'lashga va'da berdi",
+  INTERESTED:         "Qiziqdi",
+  NOT_INTERESTED:     "Qiziqmadi",
+  CALLBACK_REQUESTED: "Qayta qo'ng'iroq so'radi",
+};
 
 export const PERMISSIONS = {
   // Clients
