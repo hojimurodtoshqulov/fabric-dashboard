@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import {
   LayoutDashboard, Users, ShoppingCart, CreditCard,
   Phone, MessageSquare, BarChart3, Megaphone,
-  Globe, CheckSquare, Bell, Settings, Factory,
+  Globe, CheckSquare, Bell, Settings, Factory, Warehouse,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
@@ -16,8 +16,9 @@ const NAV_ITEMS = [
   { href: "/crm/clients", label: "CRM", icon: Users },
   { href: "/sales/invoices", label: "Savdo", icon: ShoppingCart },
   { href: "/sales/debts", label: "Qarzlar", icon: CreditCard },
+  { href: "/warehouse", label: "Omborxona", icon: Warehouse },
   { href: "/ai-calls", label: "AI Qo'ng'iroqlar", icon: Phone },
-  { href: "/messages/telegram", label: "Xabarlar", icon: MessageSquare },
+  { href: "/messages", label: "Xabarlar", icon: MessageSquare },
   { href: "/analytics", label: "Analitika", icon: BarChart3 },
   { href: "/marketing", label: "Marketing", icon: Megaphone },
   { href: "/website", label: "Veb-sayt", icon: Globe },

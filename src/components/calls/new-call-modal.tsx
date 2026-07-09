@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Phone, Search, X, Loader2, Music } from "lucide-react";
-import { CALL_MODE_LABELS } from "@/constants";
+import { CALL_MODE_LABELS, SEGMENT_TEMPLATE_TYPES } from "@/constants";
 
 const PURPOSES = [
   { value: "DEBT_REMINDER", label: "Qarz eslatmasi" },
@@ -27,6 +27,9 @@ interface TemplateSummary { id: string; name: string; type: string }
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  initialClient?: { id: string; name: string; phone: string };
+  initialPurpose?: string;
+  initialSegment?: string;
 }
 
 const CALL_MODES = [
@@ -34,7 +37,7 @@ const CALL_MODES = [
   { value: "AI_DYNAMIC", label: CALL_MODE_LABELS.AI_DYNAMIC },
 ];
 
-export function NewCallModal({ open, onOpenChange }: Props) {
+export function NewCallModal({ open, onOpenChange, initialClient, initialPurpose, initialSegment }: Props) {
   const queryClient = useQueryClient();
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<ClientHit | null>(null);
@@ -44,13 +47,28 @@ export function NewCallModal({ open, onOpenChange }: Props) {
   const [voiceTemplateId, setVoiceTemplateId] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!open) return;
+    setSelectedClient(initialClient ?? null);
+    setPurpose(initialPurpose ?? "DEBT_REMINDER");
+    setClientSearch("");
+    setShowDropdown(false);
+    setCallMode("TEMPLATE");
+    setVoiceTemplateId("");
+    setError("");
+  }, [open, initialClient, initialPurpose]);
+
   const { data: templatesData } = useQuery({
     queryKey: ["voice-templates"],
     queryFn: () => fetch("/api/voice-templates").then((r) => r.json()),
     enabled: open,
     staleTime: 60_000,
   });
-  const templates: TemplateSummary[] = templatesData?.data?.templates?.filter((t: { isActive: boolean }) => t.isActive) ?? [];
+  const allowedTypes = initialSegment ? SEGMENT_TEMPLATE_TYPES[initialSegment] : null;
+  const templates: TemplateSummary[] = (templatesData?.data?.templates ?? [])
+    .filter((t: { isActive: boolean; type: string }) =>
+      t.isActive && (!allowedTypes || allowedTypes.includes(t.type))
+    );
 
   const { data: searchData } = useQuery({
     queryKey: ["call-client-search", clientSearch],

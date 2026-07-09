@@ -8,11 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VOICE_TEMPLATE_LABELS } from "@/constants";
 import type { DtmfKey } from "@/types";
 
-const TEMPLATE_TYPES = Object.entries(VOICE_TEMPLATE_LABELS);
+const SEGMENT_GROUPS = [
+  { label: "Doimiy mijozlar",  types: ["BONUS_OFFER", "NEW_CAMPAIGN", "PAYMENT_CONFIRMATION"] },
+  { label: "Qarzdor mijozlar", types: ["DEBT_DUE_SOON", "DEBT_OVERDUE"] },
+  { label: "Eski yo'qotilgan", types: ["LOST_CLIENT_REACTIVATION"] },
+  { label: "Yangi mijozlar",   types: ["PROSPECT_INTRO"] },
+  { label: "Maxsus / Umumiy",  types: ["CUSTOM"] },
+];
 
 interface Props {
   open: boolean;
@@ -27,9 +33,10 @@ interface Props {
     isActive: boolean;
     dtmfConfig?: { keys: DtmfKey[] } | null;
   } | null;
+  initialType?: string;
 }
 
-export function VoiceTemplateModal({ open, onOpenChange, template }: Props) {
+export function VoiceTemplateModal({ open, onOpenChange, template, initialType }: Props) {
   const qc = useQueryClient();
   const isEdit = Boolean(template);
 
@@ -47,9 +54,9 @@ export function VoiceTemplateModal({ open, onOpenChange, template }: Props) {
       setDesc(template.description ?? "");
       setDtmfKeys(template.dtmfConfig?.keys ?? []);
     } else {
-      setName(""); setType("CUSTOM"); setTitle(""); setDesc(""); setDtmfKeys([]);
+      setName(""); setType(initialType ?? "CUSTOM"); setTitle(""); setDesc(""); setDtmfKeys([]);
     }
-  }, [template, open]);
+  }, [template, open, initialType]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -116,8 +123,17 @@ export function VoiceTemplateModal({ open, onOpenChange, template }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  {TEMPLATE_TYPES.map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  {SEGMENT_GROUPS.map((grp) => (
+                    <SelectGroup key={grp.label}>
+                      <div className="px-2 py-1 text-xs font-semibold text-slate-500 select-none">
+                        {grp.label}
+                      </div>
+                      {grp.types.map((v) => (
+                        <SelectItem key={v} value={v} className="text-white focus:bg-slate-700">
+                          {VOICE_TEMPLATE_LABELS[v] ?? v}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
