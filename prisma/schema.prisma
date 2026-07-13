@@ -41,6 +41,7 @@ model User {
   messages         Message[]
   stockMovements   StockMovement[] @relation("StockMovements")
   productionLogs   ProductionLog[] @relation("ProductionLogs")
+  budgetOrgs       BudgetOrg[]     @relation("BudgetOrgCreatedBy")
 
   @@map("users")
 }
@@ -1128,6 +1129,45 @@ model OneCSync {
 
   @@index([status])
   @@map("onec_syncs")
+}
+
+// ============================================================
+// BUDGET ORGANIZATIONS
+// ============================================================
+
+enum BudgetOrgStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+  CONTRACT
+  REJECTED
+}
+
+model BudgetOrg {
+  id            String          @id @default(cuid())
+  name          String
+  phone         String
+  phone2        String?
+  email         String?
+  address       String?
+  region        String?
+  province      String?
+  status        BudgetOrgStatus @default(PROSPECT)
+  inn           String?
+  notes         String?
+  contactPerson String?
+  position      String?
+  orgType       String?
+
+  createdById String
+  createdBy   User   @relation("BudgetOrgCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([province])
+  @@index([status])
+  @@map("budget_orgs")
 }
 
 // ============================================================

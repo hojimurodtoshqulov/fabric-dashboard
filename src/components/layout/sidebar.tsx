@@ -7,13 +7,14 @@ import {
   LayoutDashboard, Users, ShoppingCart, CreditCard,
   Phone, MessageSquare, BarChart3, Megaphone,
   Globe, CheckSquare, Bell, Settings, Factory, Warehouse,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Building2,
 } from "lucide-react";
 import { useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/overview", label: "Bosh sahifa", icon: LayoutDashboard },
   { href: "/crm/clients", label: "CRM", icon: Users },
+  { href: "/budget-orgs", label: "Budjet tashkilotlari", icon: Building2 },
   { href: "/sales/invoices", label: "Savdo", icon: ShoppingCart },
   { href: "/sales/debts", label: "Qarzlar", icon: CreditCard },
   { href: "/warehouse", label: "Omborxona", icon: Warehouse },
