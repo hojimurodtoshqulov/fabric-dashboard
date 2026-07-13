@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "LeadSource" AS ENUM ('TELEGRAM', 'WEBSITE', 'INSTAGRAM');
+CREATE TYPE "LeadChannel" AS ENUM ('TELEGRAM', 'WEBSITE', 'INSTAGRAM');
 
 -- CreateEnum
 CREATE TYPE "LeadStatus" AS ENUM ('NEW', 'IN_PROGRESS', 'CLOSED', 'CONVERTED');
@@ -7,7 +7,7 @@ CREATE TYPE "LeadStatus" AS ENUM ('NEW', 'IN_PROGRESS', 'CLOSED', 'CONVERTED');
 -- CreateTable
 CREATE TABLE "leads" (
     "id"           TEXT NOT NULL,
-    "source"       "LeadSource" NOT NULL,
+    "source"       "LeadChannel" NOT NULL,
     "name"         TEXT,
     "phone"        TEXT,
     "province"     TEXT,

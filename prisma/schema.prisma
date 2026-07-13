@@ -618,7 +618,7 @@ model SMSLog {
 
 model Lead {
   id           String     @id @default(cuid())
-  source       LeadSource
+  source       LeadChannel
   name         String?
   phone        String?
   province     String?
@@ -639,7 +639,7 @@ model Lead {
   @@map("leads")
 }
 
-enum LeadSource {
+enum LeadChannel {
   TELEGRAM
   WEBSITE
   INSTAGRAM
