@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   Package, TrendingUp, TrendingDown, AlertTriangle, ArrowRight,
-  Factory, Loader2, RefreshCw, Clock, Plus,
+  Factory, Loader2, RefreshCw, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,48 +57,12 @@ export default function WarehouseDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-            <div className="p-2 bg-orange-500/15 rounded-xl"><Factory className="h-5 w-5 text-orange-400" /></div>
-            Omborxona
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">Ombor holati va harakatlar</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white"
-            onClick={() => qc.invalidateQueries({ queryKey: ["warehouse-stats"] })}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Link href="/warehouse/movements">
-            <Button className="bg-emerald-600 hover:bg-emerald-500 gap-2 h-9">
-              <Plus className="h-4 w-4" /> Kirim / Chiqim
-            </Button>
-          </Link>
-        </div>
+      <div className="flex justify-end">
+        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white"
+          onClick={() => qc.invalidateQueries({ queryKey: ["warehouse-stats"] })}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
-
-      {/* Sub-nav */}
-      <nav className="flex gap-1 border-b border-slate-800 pb-0">
-        {[
-          { href: "/warehouse",            label: "Dashboard",     active: true  },
-          { href: "/warehouse/items",      label: "Mahsulotlar",   active: false },
-          { href: "/warehouse/movements",  label: "Harakatlar",    active: false },
-          { href: "/warehouse/production", label: "Ishlab chiqarish", active: false },
-          { href: "/warehouse/suppliers",  label: "Yetkazuvchilar", active: false },
-          { href: "/warehouse/reports",    label: "Hisobotlar",    active: false },
-        ].map(n => (
-          <Link key={n.href} href={n.href}
-            className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors ${
-              n.active
-                ? "border-orange-500 text-orange-400 font-medium"
-                : "border-transparent text-slate-400 hover:text-white"
-            }`}>
-            {n.label}
-          </Link>
-        ))}
-      </nav>
 
       {isLoading ? (
         <div className="py-24 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-500" /></div>

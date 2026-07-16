@@ -168,12 +168,9 @@ export default function ItemsPage() {
           <h1 className="text-2xl font-bold text-white">Mahsulotlar</h1>
           <p className="text-slate-400 text-sm mt-1">Ombordagi barcha mahsulot va xom-ashyolar</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/warehouse" className="text-xs text-slate-500 hover:text-white flex items-center gap-1 px-3 py-1.5 border border-slate-700 rounded-lg">← Dashboard</Link>
-          <Button onClick={() => setModal("new")} className="bg-orange-600 hover:bg-orange-500 gap-2 h-9">
-            <Plus className="h-4 w-4" /> Yangi mahsulot
-          </Button>
-        </div>
+        <Button onClick={() => setModal("new")} className="bg-orange-600 hover:bg-orange-500 gap-2 h-9">
+          <Plus className="h-4 w-4" /> Yangi mahsulot
+        </Button>
       </div>
 
       {/* Category filter */}
