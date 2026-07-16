@@ -31,6 +31,13 @@ const UNITS = ["kg","tonna","dona","litr","metr","m2","m3","qop","bochka","roll"
 
 function fmt(n: number) { return new Intl.NumberFormat("uz-UZ").format(Math.round(n)); }
 
+function fmtInput(v: string) {
+  if (!v) return "";
+  const [int, dec] = v.split(".");
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+}
+function numVal(v: string) { return v.replace(/,/g, ""); }
+
 function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc: any }) {
   const isEdit = !!item;
   const [form, setForm] = useState({
@@ -68,7 +75,12 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
     onError: (e: Error) => setError(e.message),
   });
 
-  const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
+  const f  = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
+  const fn = (k: string) => (e: any) => {
+    const raw = e.target.value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+    const parts = raw.split(".");
+    setForm(p => ({ ...p, [k]: parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : "") }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -105,7 +117,7 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
                 {isEdit && <span className="ml-1 text-amber-400">(tuzatish)</span>}
               </label>
               <div className="relative">
-                <Input value={form.currentStock} onChange={f("currentStock")} placeholder="0" type="number" min="0"
+                <Input value={fmtInput(form.currentStock)} onChange={fn("currentStock")} placeholder="0" inputMode="decimal"
                   className={`bg-slate-800/60 border-slate-700 text-white h-9 pr-12 ${isEdit ? "border-amber-600/50" : ""}`} />
                 {form.unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">{form.unit}</span>}
               </div>
@@ -113,18 +125,18 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Min. miqdor (ogohlantirish)</label>
               <div className="relative">
-                <Input value={form.minStock} onChange={f("minStock")} placeholder="0" type="number" min="0"
+                <Input value={fmtInput(form.minStock)} onChange={fn("minStock")} placeholder="0" inputMode="decimal"
                   className="bg-slate-800/60 border-slate-700 text-white h-9 pr-12" />
                 {form.unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">{form.unit}</span>}
               </div>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Narx (so'm/birlik)</label>
-              <Input value={form.costPrice} onChange={f("costPrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
+              <Input value={fmtInput(form.costPrice)} onChange={fn("costPrice")} placeholder="0" inputMode="decimal" className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Sotuv narxi</label>
-              <Input value={form.salePrice} onChange={f("salePrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
+              <Input value={fmtInput(form.salePrice)} onChange={fn("salePrice")} placeholder="0" inputMode="decimal" className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-500 mb-1 block">Izoh</label>

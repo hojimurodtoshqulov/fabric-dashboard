@@ -27,6 +27,11 @@ const MOVE_CFG: Record<string, { label: string; cls: string; sign: string }> = {
 };
 
 function fmt(n: number) { return new Intl.NumberFormat("uz-UZ").format(Math.round(n)); }
+function fmtInput(v: string) {
+  if (!v) return "";
+  const [int, dec] = v.split(".");
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+}
 function fmtDate(d: string) {
   return new Date(d).toLocaleString("uz-UZ", { day:"2-digit", month:"2-digit", year:"2-digit", hour:"2-digit", minute:"2-digit" });
 }
@@ -67,7 +72,7 @@ function MovementModal({ type, onClose, qc }: { type: "IN" | "OUT"; onClose: () 
   const supSuggestions  = supData?.data?.suppliers ?? [];
 
   const total = selectedItem && form.quantity && form.unitPrice
-    ? parseFloat(form.quantity) * parseFloat(form.unitPrice)
+    ? parseFloat(form.quantity.replace(/,/g, "")) * parseFloat(form.unitPrice.replace(/,/g, ""))
     : 0;
 
   const save = useMutation({
@@ -99,7 +104,12 @@ function MovementModal({ type, onClose, qc }: { type: "IN" | "OUT"; onClose: () 
     onError: (e: Error) => setError(e.message),
   });
 
-  const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
+  const f  = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
+  const fn = (k: string) => (e: any) => {
+    const raw = e.target.value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+    const parts = raw.split(".");
+    setForm(p => ({ ...p, [k]: parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : "") }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -155,14 +165,14 @@ function MovementModal({ type, onClose, qc }: { type: "IN" | "OUT"; onClose: () 
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Miqdor *</label>
               <div className="flex gap-1">
-                <Input value={form.quantity} onChange={f("quantity")} placeholder="0" type="number" min="0"
+                <Input value={fmtInput(form.quantity)} onChange={fn("quantity")} placeholder="0" inputMode="decimal"
                   className="bg-slate-800/60 border-slate-700 text-white h-9 flex-1" />
                 {selectedItem && <span className="flex items-center px-2 text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-md">{selectedItem.unit}</span>}
               </div>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Narx (so'm/{selectedItem?.unit ?? "birlik"})</label>
-              <Input value={form.unitPrice} onChange={f("unitPrice")} placeholder="0" type="number" min="0"
+              <Input value={fmtInput(form.unitPrice)} onChange={fn("unitPrice")} placeholder="0" inputMode="decimal"
                 className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
           </div>

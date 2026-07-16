@@ -10,6 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 function fmt(n: number) { return new Intl.NumberFormat("uz-UZ").format(+n.toFixed(3)); }
+function fmtInput(v: string) {
+  if (!v) return "";
+  const [int, dec] = v.split(".");
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+}
+function numHandler(setter: (v: string) => void) {
+  return (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+    const parts = raw.split(".");
+    setter(parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : ""));
+  };
+}
 
 // ── Run Production Modal ──
 function RunModal({ recipe, onClose, qc }: { recipe: any; onClose: () => void; qc: any }) {
@@ -18,7 +30,7 @@ function RunModal({ recipe, onClose, qc }: { recipe: any; onClose: () => void; q
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState<{ outputQty: number } | null>(null);
 
-  const batchNum  = parseFloat(batches) || 0;
+  const batchNum  = parseFloat(batches.replace(/,/g, "")) || 0;
   const outputQty = batchNum * parseFloat(recipe.outputQty);
 
   const run = useMutation({
@@ -66,7 +78,7 @@ function RunModal({ recipe, onClose, qc }: { recipe: any; onClose: () => void; q
             <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Batch soni</label>
-                <Input value={batches} onChange={e => setBatches(e.target.value)} type="number" min="0.001" step="0.1"
+                <Input value={fmtInput(batches)} onChange={numHandler(setBatches)} inputMode="decimal"
                   placeholder="1" className="bg-slate-800/60 border-slate-700 text-white h-9" />
                 <p className="text-xs text-slate-500 mt-1">
                   Natija: <span className="text-indigo-300 font-medium">{fmt(outputQty)} {recipe.outputItem.unit} {recipe.outputItem.name}</span>
@@ -209,8 +221,8 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
             <label className="text-xs text-slate-500 mb-1 block">
               Bir batch natijasi ({selectedOut?.unit ?? "birlik"}) *
             </label>
-            <Input value={form.outputQty} onChange={e => setForm(p => ({...p, outputQty: e.target.value}))}
-              placeholder="0" type="number" min="0"
+            <Input value={fmtInput(form.outputQty)} onChange={numHandler(v => setForm(p => ({...p, outputQty: v})))}
+              placeholder="0" inputMode="decimal"
               className="bg-slate-800/60 border-slate-700 text-white h-9" />
           </div>
 
