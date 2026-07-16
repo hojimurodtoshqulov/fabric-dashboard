@@ -131,13 +131,27 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
               </div>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Narx (so'm/birlik)</label>
+              <label className="text-xs text-slate-500 mb-1 block">Narx (so'm / 1 {form.unit})</label>
               <Input value={fmtInput(form.costPrice)} onChange={fn("costPrice")} placeholder="0" inputMode="decimal" className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Sotuv narxi</label>
+              <label className="text-xs text-slate-500 mb-1 block">Sotuv narxi (so'm / 1 {form.unit})</label>
               <Input value={fmtInput(form.salePrice)} onChange={fn("salePrice")} placeholder="0" inputMode="decimal" className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
+            {(() => {
+              const qty   = parseFloat(form.currentStock) || 0;
+              const price = parseFloat(form.costPrice)    || 0;
+              const total = qty * price;
+              if (!qty || !price) return null;
+              return (
+                <div className="col-span-2 flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2.5">
+                  <span className="text-xs text-slate-400">
+                    {fmtInput(form.currentStock)} {form.unit} × {fmtInput(form.costPrice)} so'm
+                  </span>
+                  <span className="text-sm font-semibold text-emerald-400">= {fmt(total)} so'm</span>
+                </div>
+              );
+            })()}
             <div className="col-span-2">
               <label className="text-xs text-slate-500 mb-1 block">Izoh</label>
               <Input value={form.description} onChange={f("description")} placeholder="Ixtiyoriy" className="bg-slate-800/60 border-slate-700 text-white h-9" />
@@ -225,7 +239,7 @@ export default function ItemsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700/60">
-                {["Nomi", "SKU", "Kategoriya", "Mavjud miqdor", "Min. miqdor", "Narx", "Holat", ""].map(h => (
+                {["Nomi", "SKU", "Kategoriya", "Mavjud miqdor", "Min. miqdor", "Narx", "Umumiy narxi", "Holat", ""].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -254,7 +268,13 @@ export default function ItemsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-400">{minStk > 0 ? `${minStk} ${it.unit}` : "—"}</td>
-                    <td className="px-4 py-3 text-slate-300">{fmt(parseFloat(it.costPrice))} so'm</td>
+                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmt(parseFloat(it.costPrice))} so'm</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {stock > 0 && parseFloat(it.costPrice) > 0
+                        ? <span className="text-emerald-400 font-medium">{fmt(stock * parseFloat(it.costPrice))} so'm</span>
+                        : <span className="text-slate-600">—</span>
+                      }
+                    </td>
                     <td className="px-4 py-3">
                       {isCrit  ? <span className="flex items-center gap-1 text-xs text-red-400"><AlertTriangle className="h-3 w-3" />Kritik</span>
                        : isLow ? <span className="flex items-center gap-1 text-xs text-amber-400"><AlertTriangle className="h-3 w-3" />Kam</span>
