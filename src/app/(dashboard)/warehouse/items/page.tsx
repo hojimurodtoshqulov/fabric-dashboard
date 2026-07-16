@@ -100,12 +100,15 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Narx (so'm/birlik)</label>
-              <Input value={form.costPrice} onChange={f("costPrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 mb-1 block">Sotuv narxi</label>
-              <Input value={form.salePrice} onChange={f("salePrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
+              <label className="text-xs text-slate-500 mb-1 block">
+                Mavjud miqdor
+                {isEdit && <span className="ml-1 text-amber-400">(tuzatish)</span>}
+              </label>
+              <div className="relative">
+                <Input value={form.currentStock} onChange={f("currentStock")} placeholder="0" type="number" min="0"
+                  className={`bg-slate-800/60 border-slate-700 text-white h-9 pr-12 ${isEdit ? "border-amber-600/50" : ""}`} />
+                {form.unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">{form.unit}</span>}
+              </div>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Min. miqdor (ogohlantirish)</label>
@@ -116,15 +119,12 @@ function ItemModal({ item, onClose, qc }: { item?: any; onClose: () => void; qc:
               </div>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">
-                Mavjud miqdor
-                {isEdit && <span className="ml-1 text-amber-400">(tuzatish)</span>}
-              </label>
-              <div className="relative">
-                <Input value={form.currentStock} onChange={f("currentStock")} placeholder="0" type="number" min="0"
-                  className={`bg-slate-800/60 border-slate-700 text-white h-9 pr-12 ${isEdit ? "border-amber-600/50" : ""}`} />
-                {form.unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">{form.unit}</span>}
-              </div>
+              <label className="text-xs text-slate-500 mb-1 block">Narx (so'm/birlik)</label>
+              <Input value={form.costPrice} onChange={f("costPrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Sotuv narxi</label>
+              <Input value={form.salePrice} onChange={f("salePrice")} placeholder="0" type="number" min="0" className="bg-slate-800/60 border-slate-700 text-white h-9" />
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-500 mb-1 block">Izoh</label>
