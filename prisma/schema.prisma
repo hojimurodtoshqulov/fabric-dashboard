@@ -896,20 +896,43 @@ model FunnelEntry {
 // WEBSITE MODULE
 // ============================================================
 
+enum WebsiteCategory {
+  BINT
+  VATA
+  MARLA
+  SALFETKA
+}
+
 model WebsiteProduct {
-  id           String   @id @default(cuid())
-  productId    String   @unique
-  product      Product  @relation(fields: [productId], references: [id])
-  isPublished  Boolean  @default(false)
-  isFeatured   Boolean  @default(false)
+  id           String           @id @default(cuid())
+  productId    String           @unique
+  product      Product          @relation(fields: [productId], references: [id])
+  isPublished  Boolean          @default(false)
+  isFeatured   Boolean          @default(false)
+
+  // Multilingual display fields
+  nameUz        String?
+  nameRu        String?
+  descriptionUz String?
+  descriptionRu String?
+
+  // Product details shown on website
+  packaging    String?          // e.g. "1 dona / 1 шт"
+  validity     String?          // e.g. "5 yil / 5 лет"
+  composition  String?          // e.g. "100% paxta / 100% хлопок"
+  inStock      Boolean          @default(true)
+  packageQty   Int?             // e.g. 400 units per box
+  category     WebsiteCategory?
+
+  // SEO / legacy
   seoTitle     String?
   seoDesc      String?
   seoKeywords  String[]
-  websitePrice Decimal? @db.Decimal(12, 2)
-  order        Int      @default(0)
+  websitePrice Decimal?         @db.Decimal(12, 2)
+  order        Int              @default(0)
   syncedAt     DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@map("website_products")
 }
