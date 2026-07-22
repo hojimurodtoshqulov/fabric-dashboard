@@ -188,18 +188,18 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 mt-1">
+        <div className="space-y-4 mt-2">
 
           {/* Nomi + Turi */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs uppercase tracking-wide">Nomi *</Label>
+              <Label className="text-sm text-slate-300">Nomi *</Label>
               <Input value={name} onChange={e => setName(e.target.value)}
                 placeholder="Shablon nomi"
                 className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs uppercase tracking-wide">Turi *</Label>
+              <Label className="text-sm text-slate-300">Turi *</Label>
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger className="bg-slate-800 border-slate-700 focus:border-indigo-500">
                   <SelectValue />
@@ -222,7 +222,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
 
           {/* Sarlavha */}
           <div className="space-y-1.5">
-            <Label className="text-slate-400 text-xs uppercase tracking-wide">Sarlavha *</Label>
+            <Label className="text-sm text-slate-300">Sarlavha *</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)}
               placeholder="Qo'ng'iroq sarlavhasi (mijozga eshittiriladi)"
               className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white" />
@@ -230,54 +230,41 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
 
           {/* Tavsif */}
           <div className="space-y-1.5">
-            <Label className="text-slate-400 text-xs uppercase tracking-wide">Tavsif</Label>
+            <Label className="text-sm text-slate-300">Tavsif</Label>
             <Textarea value={description} onChange={e => setDesc(e.target.value)}
-              placeholder="Shablon haqida izoh (ichki foydalanish uchun)..."
+              placeholder="Shablon haqida izoh..."
               rows={2} className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white resize-none" />
           </div>
 
           {/* Audio fayl */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-slate-400 text-xs uppercase tracking-wide">Ovoz fayli</Label>
-              {!audioUrl && (
-                <span className="text-xs text-slate-500">mp3, wav, ogg · max 20MB</span>
-              )}
+              <Label className="text-sm text-slate-300">Ovoz fayli</Label>
+              {!audioUrl && <span className="text-xs text-slate-500">mp3, wav, ogg · max 20MB</span>}
             </div>
-
             {audioUrl ? (
               <AudioPreview url={audioUrl} onRemove={() => setAudioUrl(null)} />
             ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl border border-dashed border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800/60 transition-colors disabled:opacity-50">
                 {uploading
-                  ? <div className="h-5 w-5 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-                  : <Music className="h-6 w-6 text-slate-500" />}
+                  ? <div className="h-4 w-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                  : <Music className="h-4 w-4 text-slate-500" />}
                 <span className="text-sm text-slate-400">
-                  {uploading ? "Yuklanmoqda..." : "Audio fayl yuklash uchun bosing"}
+                  {uploading ? "Yuklanmoqda..." : "Audio fayl yuklash"}
                 </span>
               </button>
             )}
-
-            <input
-              ref={fileRef}
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+            <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={handleFileChange} />
             {uploadErr && <p className="text-xs text-red-400">{uploadErr}</p>}
           </div>
 
           {/* SMS after call */}
-          <div className="space-y-3">
+          <div className="rounded-xl border border-slate-700/60 p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-slate-400" />
-                <Label className="text-slate-400 text-xs uppercase tracking-wide">Qo'ng'iroqdan keyin SMS</Label>
+                <span className="text-sm text-slate-300">Qo'ng'iroqdan keyin SMS</span>
               </div>
               <button
                 type="button"
@@ -289,26 +276,23 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
             </div>
 
             {sendSms && (
-              <div className="space-y-2 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3">
+              <div className="space-y-2 pt-1">
                 <p className="text-xs text-slate-500">
-                  Qo'ng'iroq muvaffaqiyatli bo'lganda avtomatik yuboriladi.{" "}
-                  <code className="text-indigo-400 bg-slate-800 px-1 rounded">{"{name}"}</code> — mijoz ismi.
+                  Qo'ng'iroq muvaffaqiyatli bo'lganda yuboriladi.{" "}
+                  <code className="text-indigo-400">{"{name}"}</code> — mijoz ismi.
                 </p>
                 <Textarea
                   value={smsText}
                   onChange={e => setSmsText(e.target.value)}
-                  rows={3}
+                  rows={2}
                   placeholder="SMS matni..."
-                  className="bg-slate-900 border-slate-700 focus:border-indigo-500 text-white text-sm resize-none"
+                  className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white text-sm resize-none"
                 />
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-slate-500">{smsText.length} belgi</span>
-                  <button
-                    type="button"
-                    onClick={() => setSendSms(false)}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
-                  >
-                    <X className="h-3 w-3" /> SMS ni o'chirish
+                  <button type="button" onClick={() => setSendSms(false)}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1">
+                    <X className="h-3 w-3" /> O'chirish
                   </button>
                 </div>
               </div>
@@ -316,9 +300,9 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
           </div>
 
           {/* DTMF */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-slate-400 text-xs uppercase tracking-wide">DTMF tugmalari</Label>
+              <Label className="text-sm text-slate-300">DTMF tugmalari</Label>
               <Button size="sm" variant="ghost"
                 className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 gap-1 h-7 text-xs"
                 onClick={addDtmfKey}>
@@ -327,12 +311,9 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
             </div>
 
             {dtmfKeys.length === 0 ? (
-              <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-slate-700 px-4 py-3">
-                <span className="text-2xl select-none">🔢</span>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  DTMF tugmalari yo'q. Mijoz qo'ng'iroq vaqtida raqam bosganda muayyan amal bajarish uchun qo'shing.
-                </p>
-              </div>
+              <p className="text-xs text-slate-500 py-1">
+                Raqam bosganda amal bajarish uchun qo'shing.
+              </p>
             ) : (
               <div className="space-y-2">
                 {dtmfKeys.map((k, i) => (
@@ -368,7 +349,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 mt-5 pt-4 border-t border-slate-800">
+        <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800">
           <Button variant="ghost" className="flex-1 border border-slate-700 text-slate-300 hover:bg-slate-800"
             onClick={() => onOpenChange(false)}>
             Bekor qilish
