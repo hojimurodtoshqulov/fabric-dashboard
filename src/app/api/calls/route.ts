@@ -49,14 +49,18 @@ export async function POST(req: NextRequest) {
       if (client?.phone) {
         let audioFileUrl: string | undefined;
         let dtmfConfig = null;
+        let sendSmsAfterCall = false;
+        let smsText: string | null = null;
         if (body.voiceTemplateId) {
           const rows = await import("@/lib/db").then((m) =>
-            m.db.$queryRaw<{ audioFileUrl: string | null; dtmfConfig: unknown }[]>`
-              SELECT "audioFileUrl", "dtmfConfig" FROM voice_templates WHERE id = ${body.voiceTemplateId} LIMIT 1
+            m.db.$queryRaw<{ audioFileUrl: string | null; dtmfConfig: unknown; sendSmsAfterCall: boolean; smsText: string | null }[]>`
+              SELECT "audioFileUrl", "dtmfConfig", "sendSmsAfterCall", "smsText" FROM voice_templates WHERE id = ${body.voiceTemplateId} LIMIT 1
             `
           );
           audioFileUrl = rows[0]?.audioFileUrl ?? undefined;
           dtmfConfig = rows[0]?.dtmfConfig ?? null;
+          sendSmsAfterCall = rows[0]?.sendSmsAfterCall ?? false;
+          smsText = rows[0]?.smsText ?? null;
         }
         await scheduleTemplateCall({
           callId: call.id,
@@ -71,6 +75,8 @@ export async function POST(req: NextRequest) {
           context: {},
           attempt: 1,
           maxAttempts: 3,
+          sendSmsAfterCall,
+          smsText,
         }).catch(console.warn);
       }
       return apiCreated(call);

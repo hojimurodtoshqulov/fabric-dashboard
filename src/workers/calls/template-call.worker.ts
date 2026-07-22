@@ -49,7 +49,7 @@ export function startTemplateCallWorker() {
   const worker = new Worker<TemplateCallJobData>(
     "template-calls",
     async (job) => {
-      const { callId, clientId, clientName, clientPhone, callMode, audioFileUrl, dtmfConfig, context, attempt, maxAttempts } = job.data;
+      const { callId, clientId, clientName, clientPhone, callMode, audioFileUrl, dtmfConfig, context, attempt, maxAttempts, sendSmsAfterCall, smsText } = job.data;
 
       const log = async (event: string, detail?: string) => {
         await db.callLog.create({ data: { callId, event, detail } }).catch(() => {});
@@ -168,6 +168,19 @@ export function startTemplateCallWorker() {
         });
 
         await log(prismaStatus, `Result: ${callResultType}. Duration: ${duration}s`);
+
+        // 9. Send SMS if enabled and call was answered
+        if (sendSmsAfterCall && smsText && prismaStatus === "COMPLETED" && clientPhone) {
+          try {
+            const { SMSProvider } = await import("@/lib/messaging/sms");
+            const sms = new SMSProvider();
+            const text = smsText.replace("{name}", clientName);
+            await sms.send(clientPhone, text);
+            await log("SMS_SENT", `SMS yuborildi: ${clientPhone}`);
+          } catch (smsErr) {
+            await log("SMS_FAILED", smsErr instanceof Error ? smsErr.message : "SMS xatolik").catch(() => {});
+          }
+        }
 
         emitToRole("DIRECTOR", "CALL_STATUS", { callId, clientName, status: prismaStatus, duration, callResult: callResultType });
 

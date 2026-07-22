@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Upload, Play, Pause, Volume2, X, Music } from "lucide-react";
+import { Plus, Trash2, Play, Pause, Volume2, X, Music, MessageSquare } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ interface Props {
     id: string; name: string; type: string; title: string;
     description: string | null; audioFileUrl: string | null;
     isActive: boolean; dtmfConfig?: { keys: DtmfKey[] } | null;
+    sendSmsAfterCall?: boolean; smsText?: string | null;
   } | null;
   initialType?: string;
 }
@@ -105,10 +106,15 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
   const [type, setType]           = useState("CUSTOM");
   const [title, setTitle]         = useState("");
   const [description, setDesc]    = useState("");
-  const [audioUrl, setAudioUrl]   = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState("");
-  const [dtmfKeys, setDtmfKeys]   = useState<DtmfKey[]>([]);
+  const [audioUrl, setAudioUrl]     = useState<string | null>(null);
+  const [uploading, setUploading]   = useState(false);
+  const [uploadErr, setUploadErr]   = useState("");
+  const [dtmfKeys, setDtmfKeys]     = useState<DtmfKey[]>([]);
+  const [sendSms, setSendSms]       = useState(false);
+  const [smsText, setSmsText]       = useState("");
+
+  const SMS_OFF_TYPES = ["DEBT_DUE_SOON", "DEBT_OVERDUE"];
+  const DEFAULT_SMS = "Assalomu alaykum, {name}! Bizning rasmiy saytimiz: https://selxozmash.uz — mahsulotlar bilan tanishing.";
 
   useEffect(() => {
     if (template) {
@@ -116,9 +122,14 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
       setTitle(template.title); setDesc(template.description ?? "");
       setAudioUrl(template.audioFileUrl ?? null);
       setDtmfKeys(template.dtmfConfig?.keys ?? []);
+      setSendSms(template.sendSmsAfterCall ?? false);
+      setSmsText(template.smsText ?? DEFAULT_SMS);
     } else {
-      setName(""); setType(initialType ?? "CUSTOM");
+      const t = initialType ?? "CUSTOM";
+      setName(""); setType(t);
       setTitle(""); setDesc(""); setAudioUrl(null); setDtmfKeys([]);
+      setSendSms(!SMS_OFF_TYPES.includes(t));
+      setSmsText(DEFAULT_SMS);
     }
     setUploadErr("");
   }, [template, open, initialType]);
@@ -150,6 +161,8 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
         description: description || undefined,
         audioFileUrl: audioUrl ?? null,
         dtmfConfig: dtmfKeys.length > 0 ? { keys: dtmfKeys } : null,
+        sendSmsAfterCall: sendSms,
+        smsText: sendSms ? smsText : null,
       };
       const url    = isEdit ? `/api/voice-templates/${template!.id}` : "/api/voice-templates";
       const method = isEdit ? "PATCH" : "POST";
@@ -257,6 +270,49 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
               onChange={handleFileChange}
             />
             {uploadErr && <p className="text-xs text-red-400">{uploadErr}</p>}
+          </div>
+
+          {/* SMS after call */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-slate-400" />
+                <Label className="text-slate-400 text-xs uppercase tracking-wide">Qo'ng'iroqdan keyin SMS</Label>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSendSms(v => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent overflow-hidden transition-colors duration-200 ${sendSms ? "bg-green-600" : "bg-slate-600"}`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${sendSms ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+            </div>
+
+            {sendSms && (
+              <div className="space-y-2 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3">
+                <p className="text-xs text-slate-500">
+                  Qo'ng'iroq muvaffaqiyatli bo'lganda avtomatik yuboriladi.{" "}
+                  <code className="text-indigo-400 bg-slate-800 px-1 rounded">{"{name}"}</code> — mijoz ismi.
+                </p>
+                <Textarea
+                  value={smsText}
+                  onChange={e => setSmsText(e.target.value)}
+                  rows={3}
+                  placeholder="SMS matni..."
+                  className="bg-slate-900 border-slate-700 focus:border-indigo-500 text-white text-sm resize-none"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{smsText.length} belgi</span>
+                  <button
+                    type="button"
+                    onClick={() => setSendSms(false)}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+                  >
+                    <X className="h-3 w-3" /> SMS ni o'chirish
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* DTMF */}

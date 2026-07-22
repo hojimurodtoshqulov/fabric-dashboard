@@ -12,6 +12,8 @@ type VoiceTemplateRow = {
   audioFileUrl: string | null;
   isActive: boolean;
   dtmfConfig: DtmfConfig | null;
+  sendSmsAfterCall: boolean;
+  smsText: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -31,6 +33,8 @@ export interface CreateTemplateInput {
   audioFileUrl?: string;
   dtmfConfig?: DtmfConfig | null;
   isActive?: boolean;
+  sendSmsAfterCall?: boolean;
+  smsText?: string | null;
 }
 
 export const voiceTemplateService = {
@@ -71,11 +75,13 @@ export const voiceTemplateService = {
     const ts = new Date();
     const dtmf = input.dtmfConfig ? JSON.stringify(input.dtmfConfig) : null;
     const isActive = input.isActive ?? true;
+    const sendSms = input.sendSmsAfterCall ?? false;
+    const smsText = input.smsText ?? null;
     await db.$executeRaw`
-      INSERT INTO voice_templates (id, name, type, title, description, "audioFileUrl", "isActive", "dtmfConfig", "createdAt", "updatedAt")
+      INSERT INTO voice_templates (id, name, type, title, description, "audioFileUrl", "isActive", "dtmfConfig", "sendSmsAfterCall", "smsText", "createdAt", "updatedAt")
       VALUES (${id}, ${input.name}, ${input.type}, ${input.title},
               ${input.description ?? null}, ${input.audioFileUrl ?? null},
-              ${isActive}, ${dtmf}::jsonb, ${ts}, ${ts})
+              ${isActive}, ${dtmf}::jsonb, ${sendSms}, ${smsText}, ${ts}, ${ts})
     `;
     return (await this.getById(id))!;
   },
@@ -98,6 +104,10 @@ export const voiceTemplateService = {
       const dtmf = input.dtmfConfig ? JSON.stringify(input.dtmfConfig) : null;
       await db.$executeRaw`UPDATE voice_templates SET "dtmfConfig" = ${dtmf}::jsonb, "updatedAt" = ${ts} WHERE id = ${id}`;
     }
+    if (input.sendSmsAfterCall !== undefined)
+      await db.$executeRaw`UPDATE voice_templates SET "sendSmsAfterCall" = ${input.sendSmsAfterCall}, "updatedAt" = ${ts} WHERE id = ${id}`;
+    if (input.smsText !== undefined)
+      await db.$executeRaw`UPDATE voice_templates SET "smsText" = ${input.smsText ?? null}, "updatedAt" = ${ts} WHERE id = ${id}`;
     return (await this.getById(id))!;
   },
 

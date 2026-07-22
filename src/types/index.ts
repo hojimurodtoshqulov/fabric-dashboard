@@ -127,6 +127,8 @@ export interface TemplateCallJobData {
   };
   attempt: number;
   maxAttempts: number;
+  sendSmsAfterCall?: boolean;
+  smsText?: string | null;
 }
 
 export interface DtmfKey {

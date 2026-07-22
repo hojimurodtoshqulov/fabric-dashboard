@@ -400,9 +400,11 @@ model VoiceTemplate {
   type         VoiceTemplateType
   title        String
   description  String?
-  audioFileUrl String?
-  isActive     Boolean           @default(true)
-  dtmfConfig   Json?
+  audioFileUrl      String?
+  isActive          Boolean           @default(true)
+  dtmfConfig        Json?
+  sendSmsAfterCall  Boolean           @default(false)
+  smsText           String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
