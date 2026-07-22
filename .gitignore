@@ -33,6 +33,7 @@ uploads/
 # misc
 .DS_Store
 *.pem
+sync-agent.zip
 
 # debug
 npm-debug.log*
