@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MessageCircle, Globe, Camera, Smartphone, MapPin, RefreshCw,
   Clock, Loader2, ChevronRight, ArrowLeft, UserPlus, CheckCircle,
-  XCircle, Phone, User, StickyNote, Send, Search, Plus, X,
+  XCircle, Phone, User, StickyNote, Send, Search, Plus, X, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +128,16 @@ export default function MessagesPage() {
     },
   });
 
+  const deleteLead = useMutation({
+    mutationFn: (id: string) =>
+      fetch(`/api/leads/${id}`, { method: "DELETE" }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      qc.invalidateQueries({ queryKey: ["leads-stats"] });
+      setSelected(null);
+    },
+  });
+
   function handleTabChange(key: TabKey) {
     setTab(key);
     setProvince(null);
@@ -142,7 +152,8 @@ export default function MessagesPage() {
         lead={selected}
         onClose={() => setSelected(null)}
         onUpdate={(id, data) => updateLead.mutate({ id, ...data })}
-        isPending={updateLead.isPending}
+        onDelete={(id) => deleteLead.mutate(id)}
+        isPending={updateLead.isPending || deleteLead.isPending}
       />
     );
   }
@@ -566,14 +577,16 @@ function parseKV(msg: string): { key: string; value: string }[] | null {
 }
 
 function LeadDetail({
-  lead, onClose, onUpdate, isPending,
+  lead, onClose, onUpdate, onDelete, isPending,
 }: {
   lead: Lead;
   onClose: () => void;
   onUpdate: (id: string, data: Record<string, unknown>) => void;
+  onDelete: (id: string) => void;
   isPending: boolean;
 }) {
   const [notes, setNotes] = useState(lead.notes ?? "");
+  const [confirmDel, setConfirmDel] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -589,6 +602,31 @@ function LeadDetail({
         <span className={`text-xs px-2 py-0.5 rounded ${SOURCE_BADGE[lead.source]?.cls}`}>
           {SOURCE_BADGE[lead.source]?.label}
         </span>
+
+        {/* Delete */}
+        {confirmDel ? (
+          <div className="flex items-center gap-2 ml-2 bg-red-950/60 border border-red-700/50 rounded-lg px-3 py-1.5">
+            <span className="text-red-300 text-xs">O'chirilsinmi?</span>
+            <button
+              disabled={isPending}
+              onClick={() => onDelete(lead.id)}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-2.5 py-0.5 rounded-md transition-colors disabled:opacity-50">
+              Ha
+            </button>
+            <button
+              onClick={() => setConfirmDel(false)}
+              className="text-xs text-slate-400 hover:text-white transition-colors">
+              Bekor
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDel(true)}
+            className="ml-2 p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+            title="O'chirish">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
