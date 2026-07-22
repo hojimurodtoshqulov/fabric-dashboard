@@ -25,6 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           data: {
             name:         lead.name ?? lead.phone,
             phone:        lead.phone,
+            province:     lead.province ?? undefined,
             status:       "PROSPECT",
             notes:        lead.message ?? undefined,
             createdById:  user.id,
