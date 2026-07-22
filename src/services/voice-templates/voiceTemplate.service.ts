@@ -45,7 +45,7 @@ export const voiceTemplateService = {
       FROM voice_templates vt
       ORDER BY vt."createdAt" DESC
     `;
-    return rows.map((r) => ({ ...r, _count: { calls: Number(r.callCount) } }));
+    return rows.map(({ callCount, ...r }) => ({ ...r, _count: { calls: Number(callCount) } }));
   },
 
   async getById(id: string): Promise<VoiceTemplateWithCount | null> {
@@ -57,7 +57,8 @@ export const voiceTemplateService = {
       LIMIT 1
     `;
     if (!rows[0]) return null;
-    return { ...rows[0], _count: { calls: Number(rows[0].callCount) } };
+    const { callCount, ...r } = rows[0];
+    return { ...r, _count: { calls: Number(callCount) } };
   },
 
   async getByType(type: string): Promise<VoiceTemplateRow | null> {
