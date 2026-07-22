@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Phone, PhoneOff, PhoneMissed, BarChart3 } from "lucide-react";
+import { Phone, PhoneMissed, BarChart3, AlertCircle } from "lucide-react";
 import { CALL_RESULT_LABELS, CALL_MODE_LABELS } from "@/constants";
 
 interface ResultsData {
@@ -20,9 +20,14 @@ interface ResultsData {
 }
 
 export function CallResultsStats() {
-  const { data, isLoading } = useQuery<{ success: boolean; data: ResultsData }>({
+  const { data, isLoading, isError } = useQuery<{ success: boolean; data: ResultsData }>({
     queryKey: ["call-results"],
-    queryFn: () => fetch("/api/calls/results").then((r) => r.json()),
+    queryFn: async () => {
+      const res = await fetch("/api/calls/results");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Xatolik");
+      return json;
+    },
     staleTime: 60_000,
   });
 
@@ -32,8 +37,20 @@ export function CallResultsStats() {
     </div>
   );
 
+  if (isError || !data?.success) return (
+    <div className="flex flex-col items-center gap-3 py-16 text-slate-500">
+      <AlertCircle className="h-8 w-8 text-red-400" />
+      <p className="text-sm">Ma'lumot yuklanmadi. Sahifani yangilang.</p>
+    </div>
+  );
+
   const d = data?.data;
-  if (!d) return null;
+  if (!d || d.summary.total === 0) return (
+    <div className="flex flex-col items-center gap-3 py-16 text-slate-500">
+      <BarChart3 className="h-8 w-8" />
+      <p className="text-sm">Hali qo'ng'iroqlar amalga oshirilmagan</p>
+    </div>
+  );
 
   const statCards = [
     { label: "Jami qo'ng'iroqlar", value: d.summary.total, icon: Phone,       color: "text-indigo-400",  bg: "bg-indigo-500/10" },

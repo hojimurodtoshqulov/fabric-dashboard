@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/auth/server";
 import { apiSuccess, handleApiError } from "@/lib/utils/api";
 import { db } from "@/lib/db";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
