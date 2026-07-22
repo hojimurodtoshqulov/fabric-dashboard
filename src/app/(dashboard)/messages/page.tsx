@@ -552,6 +552,19 @@ function SmsComposeModal({ onClose, qc }: { onClose: () => void; qc: ReturnType<
 
 // ── Lead Detail Panel ─────────────────────────────────────────────────────────
 
+function parseKV(msg: string): { key: string; value: string }[] | null {
+  const re = /\b([A-Za-zА-Яа-яA-Za-z'][a-zA-Zа-яА-Яa-z']+):/g;
+  const positions: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(msg)) !== null) positions.push(m.index);
+  if (positions.length < 2) return null;
+  return positions.map((pos, i) => {
+    const chunk = msg.slice(pos, positions[i + 1] ?? msg.length).trim();
+    const colon = chunk.indexOf(":");
+    return { key: chunk.slice(0, colon).trim(), value: chunk.slice(colon + 1).trim() };
+  });
+}
+
 function LeadDetail({
   lead, onClose, onUpdate, isPending,
 }: {
@@ -581,8 +594,21 @@ function LeadDetail({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-2">Xabar</p>
-            <p className="text-slate-200 leading-relaxed">{lead.message}</p>
+            <p className="text-xs text-slate-500 mb-3">Xabar</p>
+            {lead.message ? (() => {
+              const kv = parseKV(lead.message);
+              if (kv) return (
+                <dl className="space-y-3">
+                  {kv.map((row, i) => (
+                    <div key={i} className="space-y-0.5">
+                      <dt className="text-xs text-slate-500 uppercase tracking-wide">{row.key}</dt>
+                      <dd className="text-slate-200 text-sm leading-relaxed">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              );
+              return <p className="text-slate-200 text-sm leading-relaxed">{lead.message}</p>;
+            })() : <p className="text-slate-500 text-sm italic">Xabar yo'q</p>}
           </div>
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 space-y-2">
             <p className="text-xs text-slate-500 flex items-center gap-1.5">
