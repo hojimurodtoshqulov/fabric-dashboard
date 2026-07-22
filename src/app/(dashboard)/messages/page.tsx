@@ -121,9 +121,15 @@ export default function MessagesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }).then((r) => r.json()),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["leads-stats"] });
+      if ((variables as any).status === "CONVERTED") {
+        // New client created — refresh all client lists everywhere
+        qc.invalidateQueries({ queryKey: ["clients"] });
+        qc.invalidateQueries({ queryKey: ["bulk-clients"] });
+        qc.invalidateQueries({ queryKey: ["ai-calls-segments"] });
+      }
       setSelected(null);
     },
   });

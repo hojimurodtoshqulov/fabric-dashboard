@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("messages:send");
+    const user = await requirePermission("messages:send");
 
     const { id }  = await params;
     const body    = await req.json();
@@ -16,6 +16,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (notes !== undefined)        updateData.notes        = notes;
     if (assignedToId !== undefined) updateData.assignedToId = assignedToId;
     if (clientId !== undefined)     updateData.clientId     = clientId;
+
+    // Auto-create a Client when converting a lead, if not already linked
+    if (status === "CONVERTED") {
+      const lead = await (db as any).lead.findUnique({ where: { id } });
+      if (lead && !lead.clientId && lead.phone) {
+        const newClient = await (db as any).client.create({
+          data: {
+            name:         lead.name ?? lead.phone,
+            phone:        lead.phone,
+            status:       "PROSPECT",
+            notes:        lead.message ?? undefined,
+            createdById:  user.id,
+            lastActivity: new Date(),
+          },
+        });
+        updateData.clientId = newClient.id;
+      }
+    }
 
     const lead = await (db as any).lead.update({
       where: { id },
