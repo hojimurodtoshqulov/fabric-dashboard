@@ -188,7 +188,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
+        <div className="space-y-3 mt-2">
 
           {/* Nomi + Turi */}
           <div className="grid grid-cols-2 gap-3">
@@ -233,7 +233,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
             <Label className="text-sm text-slate-300">Tavsif</Label>
             <Textarea value={description} onChange={e => setDesc(e.target.value)}
               placeholder="Shablon haqida izoh..."
-              rows={2} className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white resize-none" />
+              rows={2} className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white resize-none min-h-0 h-16" />
           </div>
 
           {/* Audio fayl */}
@@ -286,7 +286,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
                   onChange={e => setSmsText(e.target.value)}
                   rows={2}
                   placeholder="SMS matni..."
-                  className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white text-sm resize-none"
+                  className="bg-slate-800 border-slate-700 focus:border-indigo-500 text-white text-sm resize-none min-h-0 h-16"
                 />
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-slate-500">{smsText.length} belgi</span>
