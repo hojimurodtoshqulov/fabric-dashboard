@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     await requirePermission("calls:create");
     const body = await req.json();
-    const { name, type, title, description, audioFileUrl, dtmfConfig, isActive } = body as {
+    const { name, type, title, description, audioFileUrl, dtmfConfig, isActive, sendSmsAfterCall, smsText } = body as {
       name: string;
       type: string;
       title: string;
@@ -24,13 +24,15 @@ export async function POST(req: NextRequest) {
       audioFileUrl?: string;
       dtmfConfig?: object | null;
       isActive?: boolean;
+      sendSmsAfterCall?: boolean;
+      smsText?: string | null;
     };
 
     if (!name || !type || !title) {
       return handleApiError(Object.assign(new Error("name, type, title are required"), { code: "VALIDATION_ERROR" }));
     }
 
-    const template = await voiceTemplateService.create({ name, type, title, description, audioFileUrl, dtmfConfig: dtmfConfig as import("@/types").DtmfConfig, isActive });
+    const template = await voiceTemplateService.create({ name, type, title, description, audioFileUrl, dtmfConfig: dtmfConfig as import("@/types").DtmfConfig, isActive, sendSmsAfterCall, smsText });
     return apiCreated({ template });
   } catch (e) {
     return handleApiError(e);
