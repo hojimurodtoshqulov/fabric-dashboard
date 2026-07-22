@@ -139,6 +139,8 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
   const [showOutDd,  setShowOutDd]  = useState(false);
   const [showIngDd,  setShowIngDd]  = useState(false);
   const [selectedOut, setSelectedOut] = useState<any>(null);
+  const [pendingIng,  setPendingIng]  = useState<any>(null);
+  const [pendingQty,  setPendingQty]  = useState("");
   const [error,       setError]       = useState("");
 
   const { data: outData } = useQuery({
@@ -149,11 +151,20 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
   const { data: ingData } = useQuery({
     queryKey: ["w-ing-search", ingSearch],
     queryFn:  () => fetch(`/api/warehouse/items?search=${encodeURIComponent(ingSearch)}&limit=6`).then(r => r.json()),
-    enabled:  ingSearch.length >= 1,
+    enabled:  ingSearch.length >= 1 && !pendingIng,
   });
 
   const outSuggs = outData?.data?.items ?? [];
   const ingSuggs = ingData?.data?.items ?? [];
+
+  function addIngredient() {
+    const qty = parseFloat(pendingQty.replace(/,/g, ""));
+    if (!pendingIng || !qty || qty <= 0) return;
+    setIngredients(p => [...p, { itemId: pendingIng.id, quantity: String(qty), _item: pendingIng }]);
+    setPendingIng(null);
+    setPendingQty("");
+    setIngSearch("");
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -183,15 +194,17 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Formula nomi *</label>
             <Input value={form.name} onChange={e => setForm(p => ({...p, name: e.target.value}))}
-              placeholder="Masalan: Paxtadan gazlama" className="bg-slate-800/60 border-slate-700 text-white h-9" />
+              placeholder="Masalan: Rulondan upakovkaga" className="bg-slate-800/60 border-slate-700 text-white h-9" />
           </div>
 
           {/* Output item */}
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Tayyor mahsulot (natija) *</label>
+            <p className="text-xs text-slate-600 mb-1.5">Ishlab chiqarish natijasida nima hosil bo'ladi?</p>
             {selectedOut ? (
               <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2">
                 <span className="flex-1 text-sm text-white">{selectedOut.name}</span>
+                <span className="text-xs text-slate-500">{selectedOut.unit}</span>
                 <button onClick={() => { setSelectedOut(null); setForm(p => ({...p, outputItemId: ""})); setOutSearch(""); }}>
                   <X className="h-4 w-4 text-slate-500" />
                 </button>
@@ -200,17 +213,23 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
               <div className="relative">
                 <Input value={outSearch} onChange={e => { setOutSearch(e.target.value); setShowOutDd(true); }}
                   onFocus={() => setShowOutDd(true)} onBlur={() => setTimeout(() => setShowOutDd(false), 160)}
-                  placeholder="Mahsulot qidirish..." className="bg-slate-800/60 border-slate-700 text-white h-9 placeholder:text-slate-500" />
-                {showOutDd && outSuggs.length > 0 && (
+                  placeholder="Mahsulot qidirish (masalan: Upakovka)..." className="bg-slate-800/60 border-slate-700 text-white h-9 placeholder:text-slate-500" />
+                {showOutDd && outSearch.length >= 1 && (
                   <div className="absolute top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl z-50 shadow-xl overflow-hidden">
-                    {outSuggs.map((it: any) => (
+                    {outSuggs.length > 0 ? outSuggs.map((it: any) => (
                       <button key={it.id} type="button"
                         onMouseDown={() => { setSelectedOut(it); setForm(p => ({...p, outputItemId: it.id})); setShowOutDd(false); }}
                         className="w-full text-left px-3 py-2 hover:bg-slate-700 text-sm border-b border-slate-700/30 last:border-0">
                         <span className="text-white">{it.name}</span>
                         <span className="ml-2 text-slate-500 text-xs">{it.unit}</span>
                       </button>
-                    ))}
+                    )) : (
+                      <div className="px-3 py-3 text-xs text-slate-500">
+                        Omborda topilmadi — avval{" "}
+                        <span className="text-indigo-400 font-medium">Mahsulotlar</span>{" "}
+                        bo'limida qo'shing
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -221,6 +240,10 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
             <label className="text-xs text-slate-500 mb-1 block">
               Bir batch natijasi ({selectedOut?.unit ?? "birlik"}) *
             </label>
+            <p className="text-xs text-slate-600 mb-1.5">
+              Bitta ishlab chiqarish jarayonida nechta {selectedOut?.name ?? "mahsulot"} chiqadi?
+              Masalan: 1 batch = 1 ta upakovka bo'lsa → <span className="text-slate-400">1</span> kiriting.
+            </p>
             <Input value={fmtInput(form.outputQty)} onChange={numHandler(v => setForm(p => ({...p, outputQty: v})))}
               placeholder="0" inputMode="decimal"
               className="bg-slate-800/60 border-slate-700 text-white h-9" />
@@ -228,15 +251,19 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
 
           {/* Ingredients */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-slate-500 uppercase tracking-wide">Xom-ashyo (bir batch uchun) *</label>
-            </div>
+            <label className="text-xs text-slate-500 uppercase tracking-wide mb-1 block">Xom-ashyo (bir batch uchun) *</label>
+            <p className="text-xs text-slate-600 mb-2">
+              1 batch uchun qaysi materialdan qancha kerak? Har bir materialni qidiring va miqdorini kiriting.
+              <br/>Masalan: Paxta → 150 gr
+            </p>
+
+            {/* Added ingredients */}
             {ingredients.length > 0 && (
-              <div className="space-y-2 mb-2">
+              <div className="space-y-1.5 mb-2">
                 {ingredients.map((ing, i) => (
                   <div key={i} className="flex items-center gap-2 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2">
                     <span className="flex-1 text-sm text-white">{ing._item?.name ?? ing.itemId}</span>
-                    <span className="text-sm text-slate-400">{ing.quantity} {ing._item?.unit}</span>
+                    <span className="text-sm text-emerald-400 font-medium">{fmtInput(ing.quantity)} {ing._item?.unit}</span>
                     <button onClick={() => setIngredients(p => p.filter((_, j) => j !== i))}>
                       <X className="h-4 w-4 text-slate-500 hover:text-red-400" />
                     </button>
@@ -244,29 +271,83 @@ function RecipeModal({ onClose, qc }: { onClose: () => void; qc: any }) {
                 ))}
               </div>
             )}
-            <div className="relative">
-              <Input value={ingSearch} onChange={e => { setIngSearch(e.target.value); setShowIngDd(true); }}
-                onFocus={() => setShowIngDd(true)} onBlur={() => setTimeout(() => setShowIngDd(false), 160)}
-                placeholder="+ Xom-ashyo qo'shish..." className="bg-slate-800/60 border-slate-700 text-white h-9 placeholder:text-slate-500" />
-              {showIngDd && ingSuggs.length > 0 && (
-                <div className="absolute top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl z-50 shadow-xl overflow-hidden">
-                  {ingSuggs.map((it: any) => (
-                    <button key={it.id} type="button"
-                      onMouseDown={() => {
-                        const qty = prompt(`${it.name} — bir batch uchun qancha ${it.unit}?`);
-                        if (qty && parseFloat(qty) > 0) {
-                          setIngredients(p => [...p, { itemId: it.id, quantity: qty, _item: it }]);
-                          setIngSearch("");
-                        }
-                        setShowIngDd(false);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-700 text-sm border-b border-slate-700/30 last:border-0">
-                      <span className="text-white">{it.name}</span>
-                      <span className="ml-2 text-slate-500 text-xs">{parseFloat(it.currentStock)} {it.unit} mavjud</span>
+
+            {/* Always-visible two-column add row */}
+            <div className="flex gap-2 items-start">
+              {/* Col 1: material selector */}
+              <div className="flex-1 relative">
+                <p className="text-xs text-slate-600 mb-1">1. Material nomi</p>
+                {pendingIng ? (
+                  <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-3 h-9">
+                    <span className="flex-1 text-sm text-white truncate">{pendingIng.name}</span>
+                    <button onClick={() => { setPendingIng(null); setPendingQty(""); setIngSearch(""); }}>
+                      <X className="h-3.5 w-3.5 text-slate-500" />
                     </button>
-                  ))}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Input
+                      value={ingSearch}
+                      onChange={e => { setIngSearch(e.target.value); setShowIngDd(true); }}
+                      onFocus={() => setShowIngDd(true)}
+                      onBlur={() => setTimeout(() => setShowIngDd(false), 160)}
+                      placeholder="Paxta, Rulon..."
+                      className="bg-slate-800/60 border-slate-700 text-white h-9 placeholder:text-slate-500"
+                    />
+                    {showIngDd && ingSearch.length >= 1 && (
+                      <div className="absolute top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl z-50 shadow-xl overflow-hidden">
+                        {ingSuggs.length > 0 ? ingSuggs.map((it: any) => (
+                          <button key={it.id} type="button"
+                            onMouseDown={() => { setPendingIng(it); setShowIngDd(false); }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-700 text-sm border-b border-slate-700/30 last:border-0">
+                            <span className="text-white">{it.name}</span>
+                            <span className="ml-2 text-slate-500 text-xs">{it.unit} · {parseFloat(it.currentStock)} mavjud</span>
+                          </button>
+                        )) : (
+                          <div className="px-3 py-3 text-xs text-slate-500">
+                            Omborda topilmadi — avval{" "}
+                            <span className="text-indigo-400 font-medium">Mahsulotlar</span>{" "}
+                            bo'limida qo'shing
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Col 2: quantity */}
+              <div className="w-28 shrink-0">
+                <p className="text-xs text-slate-600 mb-1">2. Miqdor</p>
+                <div className="relative">
+                  <Input
+                    value={fmtInput(pendingQty)}
+                    onChange={numHandler(setPendingQty)}
+                    onKeyDown={e => e.key === "Enter" && addIngredient()}
+                    placeholder="0"
+                    inputMode="decimal"
+                    disabled={!pendingIng}
+                    className="bg-slate-800/60 border-slate-700 text-white h-9 pr-8 disabled:opacity-40"
+                  />
+                  {pendingIng?.unit && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+                      {pendingIng.unit}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Add button */}
+              <div className="shrink-0">
+                <p className="text-xs text-slate-600 mb-1 invisible">btn</p>
+                <button
+                  onClick={addIngredient}
+                  disabled={!pendingIng || !pendingQty}
+                  className="h-9 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Qo'sh
+                </button>
+              </div>
             </div>
           </div>
 

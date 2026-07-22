@@ -5,6 +5,7 @@ import {
   Package, MessageSquare, Eye as EyeOn, EyeOff,
   Star, StarOff, ChevronDown, ChevronUp, Plus,
   Phone, User, MapPin, Clock, Loader2, Trash2, X,
+  CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -90,7 +91,7 @@ function ProductRow({
 }: {
   item: WProduct;
   onToggle: (id: string, field: "isPublished" | "isFeatured", val: boolean) => void;
-  onSave: (id: string, data: Partial<EditForm>) => void;
+  onSave: (id: string, data: Partial<EditForm>, onSuccess?: () => void) => void;
   onDelete: (id: string) => void;
   saving: boolean;
 }) {
@@ -241,13 +242,13 @@ function ProductRow({
             </label>
             <label className="space-y-1">
               <span className="text-slate-400 text-xs">Mavjudligi</span>
-              <div className="flex items-center gap-2 pt-1.5">
+              <div className="flex items-center gap-3 pt-1.5">
                 <button
                   type="button"
                   onClick={() => set("inStock", !form.inStock)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${form.inStock ? "bg-green-600" : "bg-slate-700"}`}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent overflow-hidden transition-colors duration-200 ${form.inStock ? "bg-green-600" : "bg-slate-600"}`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.inStock ? "translate-x-5" : "translate-x-0.5"}`} />
+                  <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${form.inStock ? "translate-x-5" : "translate-x-0"}`} />
                 </button>
                 <span className="text-slate-300 text-sm">{form.inStock ? "Bor" : "Yo'q"}</span>
               </div>
@@ -270,7 +271,7 @@ function ProductRow({
               </Button>
               <Button size="sm" disabled={saving}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-4"
-                onClick={() => onSave(item.id, form)}>
+                onClick={() => onSave(item.id, form, () => setOpen(false))}>
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Saqlash"}
               </Button>
             </div>
@@ -421,7 +422,13 @@ export function WebsiteControl() {
   const [tab, setTab]         = useState<Tab>("products");
   const [showAdd, setShowAdd] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [toast, setToast]     = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const qc = useQueryClient();
+
+  const showToast = (type: "success" | "error", msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const { data: products = [], isLoading: loadingProducts } = useQuery<WProduct[]>({
     queryKey: ["website-products"],
@@ -447,7 +454,7 @@ export function WebsiteControl() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<EditForm> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<EditForm>; onSuccess?: () => void }) => {
       setSavingId(id);
       const res = await fetch(`/api/website/products/${id}`, {
         method: "PATCH",
@@ -456,8 +463,16 @@ export function WebsiteControl() {
       });
       if (!res.ok) throw new Error("Saqlash xato");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["website-products"] }); setSavingId(null); },
-    onError:   () => setSavingId(null),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["website-products"] });
+      setSavingId(null);
+      showToast("success", "Muvaffaqiyatli saqlandi ✓");
+      variables.onSuccess?.();
+    },
+    onError: () => {
+      setSavingId(null);
+      showToast("error", "Saqlashda xatolik yuz berdi");
+    },
   });
 
   const deleteMutation = useMutation({
@@ -472,6 +487,18 @@ export function WebsiteControl() {
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-sm font-medium animate-in slide-in-from-top-2 duration-200 ${
+          toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
+        }`}>
+          {toast.type === "success"
+            ? <CheckCircle2 className="h-4 w-4 shrink-0" />
+            : <XCircle className="h-4 w-4 shrink-0" />}
+          {toast.msg}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
@@ -548,7 +575,7 @@ export function WebsiteControl() {
                     item={item}
                     saving={savingId === item.id}
                     onToggle={(id, field, val) => toggleMutation.mutate({ id, field, val })}
-                    onSave={(id, data) => saveMutation.mutate({ id, data })}
+                    onSave={(id, data, onSuccess) => saveMutation.mutate({ id, data, onSuccess })}
                     onDelete={(id) => { if (confirm("O'chirilsinmi?")) deleteMutation.mutate(id); }}
                   />
                 ))
