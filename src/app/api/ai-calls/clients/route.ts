@@ -23,10 +23,11 @@ export async function GET(req: NextRequest) {
     const status = SEGMENT_STATUS[segment];
     if (!status) return apiSuccess({ clients: [], total: 0, page, limit, totalPages: 0 });
 
-    const where = {
-      status,
-      ...(province && province !== "all" && { province }),
-    };
+    const where: Record<string, unknown> = { status };
+    if (province && province !== "all") {
+      // "Noma'lum" means province IS NULL in the DB
+      where.province = province === "Noma'lum" ? null : province;
+    }
 
     const [clients, total] = await Promise.all([
       db.client.findMany({
