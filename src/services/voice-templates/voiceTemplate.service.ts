@@ -79,7 +79,7 @@ export const voiceTemplateService = {
     const smsText = input.smsText ?? null;
     await db.$executeRaw`
       INSERT INTO voice_templates (id, name, type, title, description, "audioFileUrl", "isActive", "dtmfConfig", "sendSmsAfterCall", "smsText", "createdAt", "updatedAt")
-      VALUES (${id}, ${input.name}, ${input.type}, ${input.title},
+      VALUES (${id}, ${input.name}, ${input.type}::"VoiceTemplateType", ${input.title},
               ${input.description ?? null}, ${input.audioFileUrl ?? null},
               ${isActive}, ${dtmf}::jsonb, ${sendSms}, ${smsText}, ${ts}, ${ts})
     `;
@@ -91,7 +91,7 @@ export const voiceTemplateService = {
     if (input.name !== undefined)
       await db.$executeRaw`UPDATE voice_templates SET name = ${input.name}, "updatedAt" = ${ts} WHERE id = ${id}`;
     if (input.type !== undefined)
-      await db.$executeRaw`UPDATE voice_templates SET type = ${input.type}, "updatedAt" = ${ts} WHERE id = ${id}`;
+      await db.$executeRaw`UPDATE voice_templates SET type = ${input.type}::"VoiceTemplateType", "updatedAt" = ${ts} WHERE id = ${id}`;
     if (input.title !== undefined)
       await db.$executeRaw`UPDATE voice_templates SET title = ${input.title}, "updatedAt" = ${ts} WHERE id = ${id}`;
     if (input.description !== undefined)
