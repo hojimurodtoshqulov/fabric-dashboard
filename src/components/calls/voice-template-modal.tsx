@@ -181,7 +181,7 @@ export function VoiceTemplateModal({ open, onOpenChange, template, initialType }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700/80 text-white max-w-xl max-h-[90vh] overflow-y-auto p-6">
+      <DialogContent className="bg-slate-900 border-slate-700/80 text-white max-w-xl max-h-[90vh] overflow-y-auto px-8 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {isEdit ? "Shablonni tahrirlash" : "Yangi shablon yaratish"}
