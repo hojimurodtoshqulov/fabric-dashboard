@@ -22,7 +22,7 @@ const { auth } = NextAuth({
   providers: [],
 });
 
-const PUBLIC_ROUTES = ["/login", "/api/auth", "/api/public"];
+const PUBLIC_ROUTES = ["/login", "/api/auth", "/api/public", "/api/leads"];
 const API_PREFIX = "/api";
 
 const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
