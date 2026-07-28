@@ -7,7 +7,13 @@ function isValidApiKey(req: NextRequest): boolean {
   const key =
     req.headers.get("x-sync-key") ??
     req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return Boolean(key && key === process.env.ONEC_SYNC_SECRET);
+  const envKey = process.env.ONEC_SYNC_SECRET;
+  console.log("=== SYNC DEBUG ===");
+  console.log("kelgan kalit:", JSON.stringify(key), "uzunlik:", key?.length);
+  console.log("env kalit:", JSON.stringify(envKey), "uzunlik:", envKey?.length);
+  console.log("teng mi:", key === envKey);
+  console.log("==================");
+  return Boolean(key && key === envKey);
 }
 
 export async function POST(req: NextRequest) {
