@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { scheduleTemplateCall } from "@/lib/queue";
 import { voiceTemplateService } from "@/services/voice-templates/voiceTemplate.service";
 import type { DtmfConfig } from "@/types";
+import { callSegmentWhere } from "@/lib/clients/category";
 
 interface AutomationResult {
   scheduled: number;
@@ -145,7 +146,8 @@ export const automationService = {
     if (!template) return result;
 
     const prospects = await db.client.findMany({
-      where: { status: "PROSPECT" },
+      // Never 1C clients — they already know us and our prices
+      where: { OR: [callSegmentWhere("potensial"), callSegmentWhere("yangi")], status: "PROSPECT" },
       select: { id: true, name: true, phone: true },
       take: 20,
     });
@@ -194,7 +196,7 @@ export const automationService = {
     if (!template) return result;
 
     const lostClients = await db.client.findMany({
-      where: { status: "LOST" },
+      where: callSegmentWhere("yoqotilgan"),
       select: { id: true, name: true, phone: true },
       take: 20,
     });

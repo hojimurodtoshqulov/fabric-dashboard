@@ -2,14 +2,16 @@ import { db } from "@/lib/db";
 import { getCache, setCache, deleteCache, CACHE_KEYS } from "@/lib/cache";
 import { scheduleMessage, scheduleCall, scheduleDebtReminder } from "@/lib/queue";
 import type { ClientStatus } from "@/constants";
+import type { ClientSource } from "@prisma/client";
 import type { PaginationParams } from "@/types";
+import { categoryWhere, type ClientCategory } from "@/lib/clients/category";
 
 export class ClientService {
   async list(params: PaginationParams & {
-    status?: ClientStatus; segmentId?: string;
+    status?: ClientStatus; segmentId?: string; category?: ClientCategory;
     region?: string; provinceWhere?: Record<string, unknown>;
   }) {
-    const { page = 1, limit = 20, search, status, segmentId, region, provinceWhere, sortBy = "createdAt", sortOrder = "desc" } = params;
+    const { page = 1, limit = 20, search, status, segmentId, category, region, provinceWhere, sortBy = "createdAt", sortOrder = "desc" } = params;
     const skip = (page - 1) * limit;
 
     const where = {
@@ -21,6 +23,7 @@ export class ClientService {
           { email: { contains: search, mode: "insensitive" as const } },
         ],
       }),
+      ...(category && categoryWhere(category)),
       ...(status && { status }),
       ...(segmentId && { segmentId }),
       ...(region && { region }),
@@ -78,6 +81,7 @@ export class ClientService {
     region?: string;
     province?: string;
     status?: ClientStatus;
+    source?: ClientSource;
     segmentId?: string;
     assignedToId?: string;
     leadSourceId?: string;

@@ -2,14 +2,7 @@ import { type NextRequest } from "next/server";
 import { requirePermission } from "@/lib/auth/server";
 import { apiSuccess, handleApiError, getPaginationParams } from "@/lib/utils/api";
 import { db } from "@/lib/db";
-import type { ClientStatus } from "@prisma/client";
-
-const SEGMENT_STATUS: Record<string, ClientStatus> = {
-  doimiy:     "ACTIVE",
-  qarzdor:    "DEBTOR",
-  yoqotilgan: "LOST",
-  yangi:      "PROSPECT",
-};
+import { callSegmentWhere, isCallSegment } from "@/lib/clients/category";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,14 +13,13 @@ export async function GET(req: NextRequest) {
     const province = searchParams.get("province") || "";
     const { page, limit } = getPaginationParams(req.url);
 
-    const status = SEGMENT_STATUS[segment];
-    if (!status) return apiSuccess({ clients: [], total: 0, page, limit, totalPages: 0 });
+    if (!isCallSegment(segment)) return apiSuccess({ clients: [], total: 0, page, limit, totalPages: 0 });
 
-    const where: Record<string, unknown> = { status };
-    if (province && province !== "all") {
+    const where = {
+      ...callSegmentWhere(segment),
       // "Noma'lum" means province IS NULL in the DB
-      where.province = province === "Noma'lum" ? null : province;
-    }
+      ...(province && province !== "all" && { province: province === "Noma'lum" ? null : province }),
+    };
 
     const [clients, total] = await Promise.all([
       db.client.findMany({

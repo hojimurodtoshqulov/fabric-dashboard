@@ -2,6 +2,8 @@ import { type NextRequest } from "next/server";
 import { requirePermission } from "@/lib/auth/server";
 import { apiSuccess, handleApiError } from "@/lib/utils/api";
 import { db } from "@/lib/db";
+import { pickAutoMerge } from "@/lib/clients/matching";
+import { loadOneCIndex, queueReviewForNewClients } from "@/services/crm/client-merge.service";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,18 +23,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (status === "CONVERTED") {
       const lead = await (db as any).lead.findUnique({ where: { id } });
       if (lead && !lead.clientId && lead.phone) {
-        const newClient = await (db as any).client.create({
-          data: {
-            name:         lead.name ?? lead.phone,
-            phone:        lead.phone,
-            province:     lead.province ?? undefined,
-            status:       "PROSPECT",
-            notes:        lead.message ?? undefined,
-            createdById:  user.id,
-            lastActivity: new Date(),
-          },
-        });
-        updateData.clientId = newClient.id;
+        // Already buying from us → link to the 1C client instead of a new "yangi" one
+        const onecIndex = await loadOneCIndex();
+        const onec = pickAutoMerge(onecIndex.find({ name: lead.name ?? "", phone: lead.phone }));
+        if (onec) {
+          updateData.clientId = onec.target.id;
+        } else {
+          const newClient = await (db as any).client.create({
+            data: {
+              name:         lead.name ?? lead.phone,
+              phone:        lead.phone,
+              province:     lead.province ?? undefined,
+              status:       "PROSPECT",
+              source:       lead.source,
+              notes:        lead.message ?? undefined,
+              createdById:  user.id,
+              lastActivity: new Date(),
+            },
+          });
+          updateData.clientId = newClient.id;
+          await queueReviewForNewClients([newClient.id], onecIndex);
+        }
       }
     }
 

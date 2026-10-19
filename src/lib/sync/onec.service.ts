@@ -1,4 +1,7 @@
 import { db } from "@/lib/db";
+import { detectProvince } from "@/lib/provinces";
+import { pickAutoMerge, type MatchIndex, type MatchResult, type MatchTarget } from "@/lib/clients/matching";
+import { loadMergeableIndex, loadRejectedPairs } from "@/services/crm/client-merge.service";
 
 // ─── Public interfaces (used by API route and sync agent) ─────────────────────
 
@@ -32,6 +35,10 @@ export interface SyncPayload {
   sales?: SaleRecord[];
   debts?: DebtRecord[];
   agentVersion?: string;
+  /** Same id on every batch of one agent run. */
+  runId?: string;
+  /** Set on the last batch: every debtor of the run has been sent, the rest are paid off. */
+  final?: boolean;
 }
 
 export interface SyncResult {
@@ -101,48 +108,138 @@ async function getSystemUserId(): Promise<string> {
   return fallback[0].id;
 }
 
-/** Find client by INN, then by name. Creates if missing. */
-async function findOrCreateClient(
-  name: string,
-  inn: string,
-  phone?: string,
-  systemUserId?: string
+interface SyncContext {
+  systemUserId: string;
+  // Potential/new clients, loaded on first need — most batches only touch known 1C clients.
+  mergeable?: MatchIndex<MatchTarget>;
+  rejected?: Set<string>;
+}
+
+function guessProvince(...hints: (string | undefined)[]): string | null {
+  for (const h of hints) {
+    if (!h) continue;
+    const p = detectProvince(h);
+    if (p) return p.key;
+  }
+  return null;
+}
+
+/**
+ * Resolve a 1C counterparty to a client, making sure it is marked as a 1C (faol) client.
+ *   1. same INN → that client
+ *   2. same name among 1C clients → that client
+ *   3. a potential/new client that is clearly the same business → promoted to 1C
+ *      (no duplicate is created, and its real phone/province are kept)
+ *   4. otherwise a new 1C client; doubtful look-alikes go to the review queue
+ */
+async function findOrLinkClient(
+  ctx: SyncContext,
+  rec: { name: string; inn: string; phone?: string; region?: string },
 ): Promise<{ id: string; created: boolean; updated: boolean }> {
-  // 1. Match by INN
+  const { name, inn, phone, region } = rec;
+
   if (inn) {
-    const r = await db.$queryRaw<{ id: string }[]>`
-      SELECT id FROM clients WHERE inn = ${inn} LIMIT 1
+    const r = await db.$queryRaw<{ id: string; source: string; province: string | null }[]>`
+      SELECT id, source::text, province FROM clients WHERE inn = ${inn} LIMIT 1
     `;
-    if (r[0]) return { id: r[0].id, created: false, updated: false };
+    if (r[0]) {
+      const updated = await ensureOneC(r[0].id, r[0].source, r[0].province, region ?? name);
+      return { id: r[0].id, created: false, updated };
+    }
   }
 
-  // 2. Match by name
-  const byName = await db.$queryRaw<{ id: string; inn: string | null }[]>`
-    SELECT id, inn FROM clients WHERE LOWER(name) = LOWER(${name}) LIMIT 1
+  const byName = await db.$queryRaw<{ id: string; inn: string | null; province: string | null }[]>`
+    SELECT id, inn, province FROM clients
+    WHERE source = 'ONEC' AND LOWER(name) = LOWER(${name}) LIMIT 1
   `;
   if (byName[0]) {
+    let updated = false;
     if (inn && !byName[0].inn) {
-      await db.$executeRaw`
-        UPDATE clients SET inn = ${inn}, "updatedAt" = NOW() WHERE id = ${byName[0].id}
-      `;
-      return { id: byName[0].id, created: false, updated: true };
+      await db.$executeRaw`UPDATE clients SET inn = ${inn}, "updatedAt" = NOW() WHERE id = ${byName[0].id}`;
+      updated = true;
     }
-    return { id: byName[0].id, created: false, updated: false };
+    if (await ensureOneC(byName[0].id, "ONEC", byName[0].province, region ?? name)) updated = true;
+    return { id: byName[0].id, created: false, updated };
   }
 
-  // 3. Create new client
-  if (!systemUserId) throw new Error("systemUserId required");
+  if (!ctx.mergeable) {
+    [ctx.mergeable, ctx.rejected] = await Promise.all([loadMergeableIndex(), loadRejectedPairs()]);
+  }
+  const province = guessProvince(region, name);
+  const matches = ctx.mergeable.find({ name, phone, inn });
+  const auto = pickAutoMerge(matches, province);
+
+  if (auto) {
+    const id = auto.target.id;
+    await db.$executeRaw`
+      UPDATE clients SET
+        source         = 'ONEC',
+        "onecLinkedAt" = NOW(),
+        inn            = COALESCE(inn, ${inn || null}),
+        province       = COALESCE(province, ${province}),
+        status         = CASE WHEN status = 'DEBTOR' THEN status ELSE 'ACTIVE' END,
+        notes          = CONCAT_WS(E'\n', notes, ${`1C bilan bog'landi: ${name}`}::text),
+        "updatedAt"    = NOW()
+      WHERE id = ${id}
+    `;
+    ctx.mergeable.remove(id);
+    await queueCandidates(id, matches.filter((m) => m !== auto), ctx.rejected!);
+    return { id, created: false, updated: true };
+  }
+
   const id = genId();
   const normalizedPhone =
     normalizePhone(phone) ??
     `+998000${(inn || "0000000").slice(-7).padStart(7, "0")}`;
 
   await db.$executeRaw`
-    INSERT INTO clients (id, name, phone, status, "createdById", inn, "createdAt", "updatedAt")
-    VALUES (${id}, ${name}, ${normalizedPhone}, 'PROSPECT', ${systemUserId}, ${inn || null}, NOW(), NOW())
-    ON CONFLICT DO NOTHING
+    INSERT INTO clients (id, name, phone, status, source, "onecLinkedAt", province, "createdById", inn, "createdAt", "updatedAt")
+    VALUES (${id}, ${name}, ${normalizedPhone}, 'ACTIVE', 'ONEC', NOW(), ${province}, ${ctx.systemUserId}, ${inn || null}, NOW(), NOW())
   `;
+  await queueCandidates(id, matches, ctx.rejected!);
   return { id, created: true, updated: false };
+}
+
+/** Marks an existing client as a 1C client; returns true if anything changed. */
+async function ensureOneC(id: string, source: string, province: string | null, provinceHint: string) {
+  const guessed = province ? null : guessProvince(provinceHint);
+  if (source === "ONEC" && !guessed) return false;
+  await db.$executeRaw`
+    UPDATE clients SET
+      source         = 'ONEC',
+      "onecLinkedAt" = COALESCE("onecLinkedAt", NOW()),
+      province       = COALESCE(province, ${guessed}),
+      status         = CASE WHEN source = 'ONEC' OR status = 'DEBTOR' THEN status ELSE 'ACTIVE' END,
+      "updatedAt"    = NOW()
+    WHERE id = ${id}
+  `;
+  return true;
+}
+
+async function queueCandidates(
+  onecClientId: string,
+  matches: MatchResult<MatchTarget>[],
+  rejected: Set<string>,
+) {
+  const rows = matches.filter((m) => !rejected.has(`${onecClientId}|${m.target.id}`));
+  if (!rows.length) return;
+  await db.clientMatchCandidate.createMany({
+    data: rows.map((m) => ({
+      onecClientId,
+      potentialClientId: m.target.id,
+      score: Math.round(m.score * 1000) / 1000,
+      reason: m.reason,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+/** A client that bought something is active again (a 1C debtor stays a debtor). */
+async function markBuying(clientId: string) {
+  await db.$executeRaw`
+    UPDATE clients SET status = 'ACTIVE', "lastActivity" = NOW(), "updatedAt" = NOW()
+    WHERE id = ${clientId} AND status NOT IN ('ACTIVE', 'DEBTOR')
+  `;
 }
 
 async function upsertInvoice(
@@ -237,9 +334,54 @@ async function upsertOneCDebt(debt: DebtRecord, clientId: string): Promise<void>
   if (debt.totalDebt > 0) {
     await db.$executeRaw`
       UPDATE clients SET status = 'DEBTOR', "updatedAt" = NOW()
-      WHERE id = ${clientId} AND status NOT IN ('DEBTOR', 'LOST')
+      WHERE id = ${clientId} AND status <> 'DEBTOR'
     `;
+  } else {
+    await releaseDebtors([clientId]);
   }
+}
+
+/** Debtors with no open debt left go back to plain active. */
+async function releaseDebtors(clientIds: string[]) {
+  if (!clientIds.length) return;
+  await db.$executeRaw`
+    UPDATE clients c SET status = 'ACTIVE', "updatedAt" = NOW()
+    WHERE c.id = ANY(${clientIds}::text[]) AND c.status = 'DEBTOR'
+      AND NOT EXISTS (
+        SELECT 1 FROM debts d
+        WHERE d."clientId" = c.id AND d.status IN ('PENDING', 'PARTIAL', 'OVERDUE') AND d.amount > 0
+      )
+  `;
+}
+
+/**
+ * The agent only sends clients that still owe money, so a debt paid off in 1C simply
+ * stops arriving. On the final batch of a run, close every 1C debt the run did not touch.
+ * Skipped unless every batch of the run fully succeeded — a failed batch or record would
+ * look like a paid debt.
+ */
+export async function closeDebtsMissingFromRun(runId: string): Promise<number> {
+  const runs = await db.$queryRaw<{ started: Date | null; bad: number }[]>`
+    SELECT MIN("startedAt") AS started,
+           COUNT(*) FILTER (WHERE status <> 'SUCCESS')::int AS bad
+    FROM onec_syncs WHERE "runId" = ${runId}
+  `;
+  const { started, bad } = runs[0] ?? { started: null, bad: 0 };
+  if (!started || bad > 0) return 0;
+
+  const closed = await db.$queryRaw<{ clientId: string }[]>`
+    UPDATE debts SET
+      status       = 'PAID',
+      "paidAmount" = amount,
+      "resolvedAt" = NOW(),
+      "updatedAt"  = NOW()
+    WHERE "syncSource" = '1c'
+      AND status IN ('PENDING', 'PARTIAL', 'OVERDUE')
+      AND ("lastSyncAt" IS NULL OR "lastSyncAt" < ${started})
+    RETURNING "clientId"
+  `;
+  await releaseDebtors([...new Set(closed.map((r) => r.clientId))]);
+  return closed.length;
 }
 
 // ─── Public sync processor ────────────────────────────────────────────────────
@@ -252,15 +394,16 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
     errors: [], durationMs: 0,
   };
 
-  const systemUserId = await getSystemUserId();
+  const ctx: SyncContext = { systemUserId: await getSystemUserId() };
 
   for (const sale of payload.sales ?? []) {
     try {
       if (!sale.clientName || !sale.number) continue;
-      const client = await findOrCreateClient(sale.clientName, sale.inn, sale.phone, systemUserId);
+      const client = await findOrLinkClient(ctx, { name: sale.clientName, inn: sale.inn, phone: sale.phone });
       if (client.created) result.clientsCreated++;
       if (client.updated) result.clientsUpdated++;
-      await upsertInvoice(sale, client.id, systemUserId);
+      await upsertInvoice(sale, client.id, ctx.systemUserId);
+      await markBuying(client.id);
       result.salesSynced++;
     } catch (e) {
       result.errors.push(`sale[${sale.number}]: ${e instanceof Error ? e.message : e}`);
@@ -270,7 +413,9 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
   for (const debt of payload.debts ?? []) {
     try {
       if (!debt.clientName) continue;
-      const client = await findOrCreateClient(debt.clientName, debt.inn, debt.phone, systemUserId);
+      const client = await findOrLinkClient(ctx, {
+        name: debt.clientName, inn: debt.inn, phone: debt.phone, region: debt.region,
+      });
       if (client.created) result.clientsCreated++;
       if (client.updated) result.clientsUpdated++;
       await upsertOneCDebt(debt, client.id);

@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
 function required(name) {
   const val = process.env[name];
@@ -11,6 +11,8 @@ function getConfig() {
     fabricApiUrl: required("FABRIC_API_URL").replace(/\/$/, ""),
     fabricSyncKey: required("FABRIC_SYNC_KEY"),
     syncDays: parseInt(process.env.SYNC_DAYS || "90", 10),
+    retryCount: Math.max(1, parseInt(process.env.SYNC_RETRY_COUNT || "3", 10)),
+    retryDelayMin: Math.max(0, parseInt(process.env.SYNC_RETRY_DELAY_MIN || "10", 10)),
     oneC: {
       mode: process.env.ONEC_MODE || "file",
       filePath: process.env.ONEC_FILE_PATH || "",

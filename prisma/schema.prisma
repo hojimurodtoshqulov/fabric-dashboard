@@ -137,6 +137,10 @@ model Client {
   region       String?
   province     String?
   status       ClientStatus @default(PROSPECT)
+  // Where the client came from. ONEC = faol (real buyer in 1C); MANUAL/IMPORT = potensial;
+  // WEBSITE/INSTAGRAM/TELEGRAM/WALK_IN = yangi (inbound lead).
+  source       ClientSource @default(MANUAL)
+  onecLinkedAt DateTime?
   segmentId    String?
   segment      ClientSegment? @relation(fields: [segmentId], references: [id])
   assignedToId String?
@@ -169,7 +173,11 @@ model Client {
   leadSource     LeadSource?   @relation(fields: [leadSourceId], references: [id])
   leadSourceId   String?
 
+  matchesAsOneC      ClientMatchCandidate[] @relation("MatchOneC")
+  matchesAsPotential ClientMatchCandidate[] @relation("MatchPotential")
+
   @@index([status])
+  @@index([source])
   @@index([phone])
   @@index([inn])
   @@index([province])
@@ -185,6 +193,55 @@ enum ClientStatus {
   PROSPECT
   COMPETITOR
   RISK
+}
+
+enum ClientSource {
+  ONEC
+  MANUAL
+  IMPORT
+  WEBSITE
+  INSTAGRAM
+  TELEGRAM
+  WALK_IN
+}
+
+enum MatchStatus {
+  PENDING
+  REJECTED
+}
+
+/// A potential client that may be the same business as a 1C client.
+/// Strong matches are merged automatically; the rest wait here for a human.
+model ClientMatchCandidate {
+  id                 String      @id @default(cuid())
+  onecClientId       String
+  onecClient         Client      @relation("MatchOneC", fields: [onecClientId], references: [id], onDelete: Cascade)
+  potentialClientId  String
+  potentialClient    Client      @relation("MatchPotential", fields: [potentialClientId], references: [id], onDelete: Cascade)
+  score              Float
+  reason             String
+  status             MatchStatus @default(PENDING)
+  resolvedById       String?
+  resolvedAt         DateTime?
+  createdAt          DateTime    @default(now())
+
+  @@unique([onecClientId, potentialClientId])
+  @@index([status])
+  @@map("client_match_candidates")
+}
+
+/// Snapshot of a potential client removed by merging it into a 1C client (for audit/restore).
+model ClientMerge {
+  id              String   @id @default(cuid())
+  onecClientId    String
+  removedClientId String
+  snapshot        Json
+  auto            Boolean  @default(false)
+  mergedById      String?
+  createdAt       DateTime @default(now())
+
+  @@index([onecClientId])
+  @@map("client_merges")
 }
 
 // ============================================================
@@ -1149,6 +1206,8 @@ model OneCSync {
   debtsCount     Int       @default(0)
   clientsCreated Int       @default(0)
   clientsUpdated Int       @default(0)
+  debtsClosed    Int       @default(0)
+  runId          String?
   error          String?
   createdAt      DateTime  @default(now())
 

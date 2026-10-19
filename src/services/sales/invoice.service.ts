@@ -177,6 +177,9 @@ export class InvoiceService {
       where: {
         status: { in: ["DRAFT", "SENT", "PARTIAL"] },
         dueDate: { lt: new Date() },
+        // 1C invoices never record payments here — their debt comes from the 1C
+        // account 62 balance. Turning them into debts would count every sale twice.
+        source: { not: "1c" },
       },
       include: {
         client: { select: { id: true, name: true, phone: true } },

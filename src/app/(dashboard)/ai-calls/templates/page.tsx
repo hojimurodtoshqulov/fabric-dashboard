@@ -56,8 +56,8 @@ const SEGMENT_META = [
   },
   {
     key:   "yangi",
-    label: "Yangi mijozlar",
-    desc:  "Hech qachon xaridor bo'lmagan, jalb qilish uchun",
+    label: "Potensial / yangi mijozlar",
+    desc:  "1C da yo'q, hali xaridor emas — jalb qilish uchun",
     Icon:  Sparkles,
     head:  "text-emerald-300",
     pill:  "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300",

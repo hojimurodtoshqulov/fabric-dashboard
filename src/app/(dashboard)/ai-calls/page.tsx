@@ -33,7 +33,7 @@ const SEGMENT_META = [
   { key: "doimiy",     label: "Doimiy mijozlar",  Icon: Building2,  head: "text-indigo-300",  pill: "bg-indigo-500/10 border-indigo-500/20 text-indigo-300",  btn: "border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10",  defaultType: "BONUS_OFFER"            },
   { key: "qarzdor",    label: "Qarzdor mijozlar",  Icon: AlertCircle, head: "text-amber-300",   pill: "bg-amber-500/10 border-amber-500/20 text-amber-300",   btn: "border-amber-500/30 text-amber-300 hover:bg-amber-500/10",   defaultType: "DEBT_OVERDUE"           },
   { key: "yoqotilgan", label: "Eski yo'qotilgan",  Icon: TrendingDown,head: "text-red-300",     pill: "bg-red-500/10 border-red-500/20 text-red-300",         btn: "border-red-500/30 text-red-300 hover:bg-red-500/10",         defaultType: "LOST_CLIENT_REACTIVATION"},
-  { key: "yangi",      label: "Yangi mijozlar",    Icon: Sparkles,   head: "text-emerald-300", pill: "bg-emerald-500/10 border-emerald-500/20 text-emerald-300",btn:"border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10",defaultType: "PROSPECT_INTRO"        },
+  { key: "yangi",      label: "Potensial / yangi",  Icon: Sparkles,   head: "text-emerald-300", pill: "bg-emerald-500/10 border-emerald-500/20 text-emerald-300",btn:"border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10",defaultType: "PROSPECT_INTRO"        },
   { key: "umumiy",     label: "Maxsus / Umumiy",   Icon: Layers,     head: "text-slate-300",   pill: "bg-slate-700 border-slate-600 text-slate-300",          btn: "border-slate-600 text-slate-300 hover:bg-slate-700",          defaultType: "CUSTOM"                },
 ] as const;
 

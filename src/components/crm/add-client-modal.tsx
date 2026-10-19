@@ -13,12 +13,7 @@ import {
 } from "@/components/ui/select";
 import { UserPlus, Loader2, X, PenLine } from "lucide-react";
 import { PROVINCE_GROUPS } from "@/lib/provinces";
-
-const STATUSES = [
-  { value: "ACTIVE",    label: "Faol" },
-  { value: "PROSPECT",  label: "Potensial" },
-  { value: "INACTIVE",  label: "Nofaol" },
-];
+import { MANUAL_SOURCE_OPTIONS } from "@/lib/clients/category";
 
 interface FormState {
   name: string;
@@ -26,13 +21,13 @@ interface FormState {
   company: string;
   email: string;
   region: string;
-  status: string;
+  source: string;
   notes: string;
 }
 
 const EMPTY: FormState = {
   name: "", phone: "", company: "", email: "",
-  region: "", status: "ACTIVE", notes: "",
+  region: "", source: "MANUAL", notes: "",
 };
 
 interface Props {
@@ -108,7 +103,7 @@ export function AddClientModal({ open, onOpenChange }: Props) {
           email: data.email.trim() || undefined,
           region,
           province: provinceKey || undefined,
-          status: data.status,
+          source: data.source,
           notes: data.notes.trim() || undefined,
         }),
       });
@@ -226,16 +221,16 @@ export function AddClientModal({ open, onOpenChange }: Props) {
                 </Select>
               </div>
               <div>
-                <Label className="text-slate-400 text-sm mb-1.5 block">Holat</Label>
+                <Label className="text-slate-400 text-sm mb-1.5 block">Qayerdan keldi</Label>
                 <Select
-                  value={form.status}
-                  onValueChange={(v) => setForm(p => ({ ...p, status: v }))}
+                  value={form.source}
+                  onValueChange={(v) => setForm(p => ({ ...p, source: v }))}
                 >
                   <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-300">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-700">
-                    {STATUSES.map(s => (
+                    {MANUAL_SOURCE_OPTIONS.map(s => (
                       <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>

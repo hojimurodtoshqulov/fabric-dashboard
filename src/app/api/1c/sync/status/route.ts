@@ -24,13 +24,15 @@ export async function GET(req: NextRequest) {
       debtsCount: number;
       clientsCreated: number;
       clientsUpdated: number;
+      debtsClosed: number;
+      runId: string | null;
       error: string | null;
       startedAt: Date;
       finishedAt: Date | null;
       createdAt: Date;
     }[]>`
       SELECT id, status, "salesCount", "debtsCount",
-             "clientsCreated", "clientsUpdated",
+             "clientsCreated", "clientsUpdated", "debtsClosed", "runId",
              error, "startedAt", "finishedAt", "createdAt"
       FROM onec_syncs
       ORDER BY "createdAt" DESC
@@ -38,9 +40,9 @@ export async function GET(req: NextRequest) {
     `;
 
     const last = rows[0] ?? null;
-    const isOnline = last?.status === "SUCCESS" &&
+    const isOnline = (last?.status === "SUCCESS" || last?.status === "PARTIAL") &&
       last.finishedAt &&
-      Date.now() - new Date(last.finishedAt).getTime() < 2 * 60 * 60 * 1000; // within 2h
+      Date.now() - new Date(last.finishedAt).getTime() < 26 * 60 * 60 * 1000; // agent runs once a day
 
     return apiSuccess({
       status: last?.status ?? "NEVER",

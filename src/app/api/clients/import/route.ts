@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import type { ClientStatus } from "@prisma/client";
+import { pickAutoMerge } from "@/lib/clients/matching";
+import { loadOneCIndex, queueReviewForNewClients } from "@/services/crm/client-merge.service";
 
 interface ClientRow {
   name: string;
@@ -19,7 +21,8 @@ interface ImportBody {
   province?: string;
 }
 
-const VALID_STATUSES = new Set(["ACTIVE", "INACTIVE", "LOST", "DEBTOR", "PROSPECT", "COMPETITOR", "RISK"]);
+// ACTIVE/DEBTOR belong to 1C clients only — an uploaded list is always potensial.
+const VALID_STATUSES = new Set(["INACTIVE", "LOST", "PROSPECT", "COMPETITOR", "RISK"]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
         ? "INACTIVE"
         : VALID_STATUSES.has((row.status ?? "").toUpperCase())
           ? (row.status!.toUpperCase() as ClientStatus)
-          : "ACTIVE";
+          : "PROSPECT";
 
       const errorNote = !hasName && !hasPhone
         ? "Import xatosi: ism va telefon yo'q"
@@ -65,9 +68,19 @@ export async function POST(req: NextRequest) {
     });
     const importProvince = body.province;
 
+    // 1C da bor mijozlar potensial ro'yxatga tushmasin (ular faol mijozlar)
+    const onecIndex = await loadOneCIndex();
+    const onecMatches: { row: number; name: string; onecName: string }[] = [];
+    const fresh = prepared.filter((r, i) => {
+      const m = pickAutoMerge(onecIndex.find({ name: r.name, phone: r.phone }));
+      if (!m) return true;
+      onecMatches.push({ row: body.rows[i]._rowNum ?? i + 2, name: r.name, onecName: m.target.name });
+      return false;
+    });
+
     // NOPHONE_* larni ajratamiz — bular har doim qo'shiladi
-    const noPhoneRows  = prepared.filter(r => r.phone.startsWith("NOPHONE_"));
-    const realRows     = prepared.filter(r => !r.phone.startsWith("NOPHONE_"));
+    const noPhoneRows  = fresh.filter(r => r.phone.startsWith("NOPHONE_"));
+    const realRows     = fresh.filter(r => !r.phone.startsWith("NOPHONE_"));
     const realPhones   = realRows.map(r => r.phone);
 
     // Bazada mavjud telefonlarni topamiz
@@ -86,17 +99,26 @@ export async function POST(req: NextRequest) {
 
     // NOPHONE_ va yangi telefonlarni qo'shamiz
     let created = 0;
+    let queuedForReview = 0;
     const insertAll = [...noPhoneRows, ...toInsert];
+    const importStartedAt = new Date();
     if (insertAll.length > 0) {
       const result = await db.client.createMany({
         data: insertAll.map(r => ({
           ...r,
+          source: "IMPORT" as const,
           createdById: user.id,
           lastActivity: new Date(),
         })),
         skipDuplicates: true,
       });
       created = result.count;
+      // Look-alikes of 1C clients → Dublikatlar sahifasi (kampaniyalardan ushlab turiladi)
+      const inserted = await db.client.findMany({
+        where: { createdById: user.id, source: "IMPORT", createdAt: { gte: importStartedAt } },
+        select: { id: true },
+      });
+      queuedForReview = await queueReviewForNewClients(inserted.map(c => c.id), onecIndex);
       // Province raw SQL bilan yangilaymiz
       if (importProvince) {
         const insertedPhones = insertAll.map(r => r.phone);
@@ -133,7 +155,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { created, updated, skipped, total: body.rows.length },
+      data: {
+        created, updated, skipped, total: body.rows.length,
+        skippedOneC: onecMatches.length, onecMatches: onecMatches.slice(0, 50), queuedForReview,
+      },
     });
   } catch (e) {
     console.error(e);

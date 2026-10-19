@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ClientsTable } from "@/components/crm/clients-table";
 import { AddClientModal } from "@/components/crm/add-client-modal";
@@ -9,23 +10,76 @@ import { ImportClientsModal } from "@/components/crm/import-clients-modal";
 import { Button } from "@/components/ui/button";
 import {
   UserPlus, FileSpreadsheet, ArrowLeft,
-  Users, CheckCircle, AlertTriangle, TrendingDown,
-  MapPin, UserCheck, Building2,
+  Users, CheckCircle, AlertTriangle, Sparkles,
+  MapPin, Target, Building2, GitMerge,
 } from "lucide-react";
+import { CATEGORY_LABELS, isCategory, type ClientCategory } from "@/lib/clients/category";
 
-interface RegionStats {
+interface CategoryStats {
+  total: number;
+  faol: number;      // 1C clients, debtors included
+  qarzdor: number;
+  potensial: number;
+  yangi: number;
+}
+
+interface RegionStats extends CategoryStats {
   key: string;
   label: string;
-  total: number;
-  active: number;
-  inactive: number;
-  debtor: number;
-  lost: number;
-  prospect: number;
+}
+
+const CATEGORY_CARDS: { key: ClientCategory; hint: string; Icon: typeof Users; color: string }[] = [
+  { key: "faol",      hint: "1C dagi mijozlar",          Icon: CheckCircle,   color: "text-green-400" },
+  { key: "qarzdor",   hint: "1C da qarzi bor",           Icon: AlertTriangle, color: "text-yellow-400" },
+  { key: "potensial", hint: "Yuklangan, 1C da yo'q",     Icon: Target,        color: "text-sky-400" },
+  { key: "yangi",     hint: "Sayt, Instagram, Telegram", Icon: Sparkles,      color: "text-emerald-400" },
+];
+
+// ── Category cards (also the category filter) ────────────────────────────────
+function CategoryCards({ stats, showTotal }: { stats: CategoryStats; showTotal?: boolean }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const current = searchParams.get("category");
+
+  function toggle(cat: ClientCategory) {
+    const p = new URLSearchParams(searchParams.toString());
+    if (current === cat) p.delete("category"); else p.set("category", cat);
+    router.push(`/crm/clients?${p.toString()}`);
+  }
+
+  return (
+    <div className={`grid grid-cols-2 gap-3 ${showTotal ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+      {showTotal && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
+          <Users className="h-8 w-8 text-indigo-400 shrink-0" />
+          <div>
+            <p className="text-white text-xl font-bold">{stats.total}</p>
+            <p className="text-slate-500 text-xs">Jami mijozlar</p>
+          </div>
+        </div>
+      )}
+      {CATEGORY_CARDS.map(({ key, hint, Icon, color }) => (
+        <button
+          key={key}
+          onClick={() => toggle(key)}
+          className={`bg-slate-900 border rounded-xl p-4 flex items-center gap-3 text-left transition-colors ${
+            current === key ? "border-indigo-500 bg-indigo-500/10" : "border-slate-800 hover:border-slate-600"
+          }`}
+        >
+          <Icon className={`h-8 w-8 shrink-0 ${color}`} />
+          <div className="min-w-0">
+            <p className={`text-xl font-bold ${color}`}>{stats[key]}</p>
+            <p className="text-slate-300 text-xs font-medium">{CATEGORY_LABELS[key]}</p>
+            <p className="text-slate-500 text-[10px] truncate">{hint}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // ── District chips + table ────────────────────────────────────────────────────
-function DistrictChips({ provinceKey }: { provinceKey: string }) {
+function DistrictChips({ provinceKey, category }: { provinceKey: string; category?: ClientCategory }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const selectedDistrict = searchParams.get("district");
@@ -34,6 +88,7 @@ function DistrictChips({ provinceKey }: { provinceKey: string }) {
     const p = new URLSearchParams();
     p.set("province", provinceKey);
     if (district) p.set("district", district);
+    if (category) p.set("category", category);
     router.push(`/crm/clients?${p.toString()}`);
   }
 
@@ -89,6 +144,7 @@ function DistrictChips({ provinceKey }: { provinceKey: string }) {
       <ClientsTable
         provinceKey={selectedDistrict ? undefined : provinceKey}
         exactRegion={selectedDistrict ?? undefined}
+        category={category}
       />
     </div>
   );
@@ -96,7 +152,7 @@ function DistrictChips({ provinceKey }: { provinceKey: string }) {
 
 // ── Province card ─────────────────────────────────────────────────────────────
 function ProvinceCard({ stat, onClick }: { stat: RegionStats; onClick: () => void }) {
-  const activeRate = stat.total > 0 ? Math.round((stat.active / stat.total) * 100) : 0;
+  const activeRate = stat.total > 0 ? Math.round((stat.faol / stat.total) * 100) : 0;
   const isEmpty = stat.total === 0;
 
   return (
@@ -131,7 +187,7 @@ function ProvinceCard({ stat, onClick }: { stat: RegionStats; onClick: () => voi
 
       <div className="mb-3">
         <div className="flex justify-between text-xs mb-1">
-          <span className="text-slate-500">Faollik</span>
+          <span className="text-slate-500">1C dagi ulushi</span>
           <span className="text-green-400 font-medium">{activeRate}%</span>
         </div>
         <div className="w-full bg-slate-800 rounded-full h-1.5">
@@ -144,20 +200,20 @@ function ProvinceCard({ stat, onClick }: { stat: RegionStats; onClick: () => voi
 
       <div className="grid grid-cols-4 gap-1">
         <div className="text-center">
-          <p className="text-green-400 font-bold text-sm">{stat.active}</p>
+          <p className="text-green-400 font-bold text-sm">{stat.faol}</p>
           <p className="text-slate-600 text-[10px]">Faol</p>
         </div>
         <div className="text-center">
-          <p className="text-yellow-400 font-bold text-sm">{stat.debtor}</p>
+          <p className="text-yellow-400 font-bold text-sm">{stat.qarzdor}</p>
           <p className="text-slate-600 text-[10px]">Qarzdor</p>
         </div>
         <div className="text-center">
-          <p className="text-slate-400 font-bold text-sm">{stat.inactive}</p>
-          <p className="text-slate-600 text-[10px]">Nofaol</p>
+          <p className="text-sky-400 font-bold text-sm">{stat.potensial}</p>
+          <p className="text-slate-600 text-[10px]">Potensial</p>
         </div>
         <div className="text-center">
-          <p className="text-red-400 font-bold text-sm">{stat.lost}</p>
-          <p className="text-slate-600 text-[10px]">Yo'qotilgan</p>
+          <p className="text-emerald-400 font-bold text-sm">{stat.yangi}</p>
+          <p className="text-slate-600 text-[10px]">Yangi</p>
         </div>
       </div>
     </button>
@@ -171,22 +227,31 @@ export function ClientsPageContent() {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const selectedProvinceKey = searchParams.get("province");
+  const categoryParam = searchParams.get("category");
+  const category = isCategory(categoryParam) ? categoryParam : undefined;
 
   const { data: regionData, isLoading } = useQuery({
     queryKey: ["client-regions"],
     queryFn: async () => {
       const res = await fetch("/api/clients/regions");
       const json = await res.json();
-      return json.data as { total: number; regions: RegionStats[] };
+      return json.data as { total: number; totals: CategoryStats; regions: RegionStats[] };
     },
     staleTime: 0,
   });
 
+  const { data: dupData } = useQuery({
+    queryKey: ["client-duplicates-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/clients/duplicates?limit=1");
+      const json = await res.json();
+      return json.data as { total: number };
+    },
+  });
+
   const regions = regionData?.regions ?? [];
   const total = regionData?.total ?? 0;
-  const totalActive   = regions.reduce((s, r) => s + r.active,   0);
-  const totalDebtor   = regions.reduce((s, r) => s + r.debtor,   0);
-  const totalProspect = regions.reduce((s, r) => s + r.prospect, 0);
+  const pendingDuplicates = dupData?.total ?? 0;
 
   // Always derived from fresh query data — never stale
   const selectedProvince = selectedProvinceKey
@@ -213,12 +278,26 @@ export function ClientsPageContent() {
             </h1>
             <p className="text-slate-400 text-sm mt-0.5">
               {selectedProvince
-                ? `${selectedProvince.total} ta mijoz · ${selectedProvince.active} faol`
-                : "Viloyatlar bo'yicha boshqarish"}
+                ? `${selectedProvince.total} ta mijoz · ${selectedProvince.faol} faol`
+                : "Faol — 1C dagi mijozlar · Potensial — yuklangan ro'yxat · Yangi — sayt va ijtimoiy tarmoqlardan"}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
+          <Link href="/crm/clients/duplicates">
+            <Button
+              variant="outline"
+              className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <GitMerge className="mr-2 h-4 w-4 text-amber-400" />
+              Dublikatlar
+              {pendingDuplicates > 0 && (
+                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                  {pendingDuplicates}
+                </span>
+              )}
+            </Button>
+          </Link>
           <Button
             variant="outline"
             onClick={() => setImportOpen(true)}
@@ -240,75 +319,18 @@ export function ClientsPageContent() {
       {/* ── VILOYAT TANLANDI → jadval ── */}
       {selectedProvince ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-green-400 shrink-0" />
-              <div>
-                <p className="text-green-400 text-xl font-bold">{selectedProvince.active}</p>
-                <p className="text-slate-500 text-xs">Faol</p>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-              <AlertTriangle className="h-8 w-8 text-yellow-400 shrink-0" />
-              <div>
-                <p className="text-yellow-400 text-xl font-bold">{selectedProvince.debtor}</p>
-                <p className="text-slate-500 text-xs">Qarzdor</p>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-              <Users className="h-8 w-8 text-slate-400 shrink-0" />
-              <div>
-                <p className="text-slate-300 text-xl font-bold">{selectedProvince.inactive}</p>
-                <p className="text-slate-500 text-xs">Nofaol</p>
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-              <TrendingDown className="h-8 w-8 text-red-400 shrink-0" />
-              <div>
-                <p className="text-red-400 text-xl font-bold">{selectedProvince.lost}</p>
-                <p className="text-slate-500 text-xs">Yo'qotilgan</p>
-              </div>
-            </div>
-          </div>
+          <CategoryCards stats={selectedProvince} />
 
           {/* Tuman chiplari */}
-          <DistrictChips provinceKey={selectedProvince.key} />
+          <DistrictChips provinceKey={selectedProvince.key} category={category} />
         </>
       ) : (
         <>
           {/* ── Umumiy statistika ── */}
-          {total > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-                <Users className="h-8 w-8 text-indigo-400 shrink-0" />
-                <div>
-                  <p className="text-white text-xl font-bold">{total}</p>
-                  <p className="text-slate-500 text-xs">Jami mijozlar</p>
-                </div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-green-400 shrink-0" />
-                <div>
-                  <p className="text-green-400 text-xl font-bold">{totalActive}</p>
-                  <p className="text-slate-500 text-xs">Faol</p>
-                </div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-                <AlertTriangle className="h-8 w-8 text-yellow-400 shrink-0" />
-                <div>
-                  <p className="text-yellow-400 text-xl font-bold">{totalDebtor}</p>
-                  <p className="text-slate-500 text-xs">Qarzdor</p>
-                </div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-                <UserCheck className="h-8 w-8 text-blue-400 shrink-0" />
-                <div>
-                  <p className="text-blue-400 text-xl font-bold">{totalProspect}</p>
-                  <p className="text-slate-500 text-xs">Potensial</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {total > 0 && regionData && <CategoryCards stats={regionData.totals} showTotal />}
+
+          {/* Kategoriya tanlansa — barcha viloyatlar bo'yicha jadval */}
+          {category && <ClientsTable category={category} />}
 
           {/* ── Viloyat cardlari ── */}
           {isLoading ? (
@@ -323,7 +345,7 @@ export function ClientsPageContent() {
                 <ProvinceCard
                   key={stat.key}
                   stat={stat}
-                  onClick={() => router.push(`/crm/clients?province=${stat.key}`)}
+                  onClick={() => router.push(`/crm/clients?province=${stat.key}${category ? `&category=${category}` : ""}`)}
                 />
               ))}
             </div>

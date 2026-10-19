@@ -3,19 +3,20 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Building2, AlertCircle, TrendingDown, Sparkles,
+  Building2, AlertCircle, TrendingDown, Sparkles, Target,
   ArrowLeft, Phone, MapPin, Users, Loader2, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NewCallModal } from "@/components/calls/new-call-modal";
+import type { CallSegment } from "@/lib/clients/category";
 
-type SegmentKey = "doimiy" | "qarzdor" | "yoqotilgan" | "yangi";
+type SegmentKey = CallSegment;
 
 const SEGMENTS = [
   {
     key:     "doimiy" as SegmentKey,
     label:   "Doimiy mijozlar",
-    desc:    "Faol, faktura amalga oshgan",
+    desc:    "1C dagi faol mijozlar (qarzdorlar ham)",
     Icon:    Building2,
     border:  "border-indigo-500/20 hover:border-indigo-400/40 cursor-pointer",
     active:  "border-indigo-500 bg-indigo-500/10",
@@ -26,7 +27,7 @@ const SEGMENTS = [
   {
     key:     "qarzdor" as SegmentKey,
     label:   "Qarzdor mijozlar",
-    desc:    "Qarz bor, eslatish kerak",
+    desc:    "1C da qarzi bor, eslatish kerak",
     Icon:    AlertCircle,
     border:  "border-amber-500/20 hover:border-amber-400/40 cursor-pointer",
     active:  "border-amber-500 bg-amber-500/10",
@@ -46,9 +47,20 @@ const SEGMENTS = [
     purpose: "REACTIVATION",
   },
   {
+    key:     "potensial" as SegmentKey,
+    label:   "Potensial mijozlar",
+    desc:    "Yuklangan ro'yxat, 1C da yo'q — jalb qilish",
+    Icon:    Target,
+    border:  "border-sky-500/20 hover:border-sky-400/40 cursor-pointer",
+    active:  "border-sky-500 bg-sky-500/10",
+    icon:    "bg-sky-500/15 text-sky-400",
+    count:   "text-sky-300",
+    purpose: "OFFER",
+  },
+  {
     key:     "yangi" as SegmentKey,
     label:   "Yangi mijozlar",
-    desc:    "Hech qachon olmagan, jalb qilish",
+    desc:    "Sayt, Instagram, Telegram, jonli murojaat",
     Icon:    Sparkles,
     border:  "border-emerald-500/20 hover:border-emerald-400/40 cursor-pointer",
     active:  "border-emerald-500 bg-emerald-500/10",
@@ -213,7 +225,7 @@ export function SegmentDrillDown() {
                         {fmtSum(c.lastInvoice.total)}
                       </span>
                     )}
-                    {(selectedSegment === "yoqotilgan" || selectedSegment === "yangi") && (
+                    {(selectedSegment === "yoqotilgan" || selectedSegment === "yangi" || selectedSegment === "potensial") && (
                       <span className="text-xs text-slate-500 shrink-0">
                         {fmtDate(c.lastActivity)}
                       </span>
@@ -328,7 +340,7 @@ export function SegmentDrillDown() {
           <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {SEGMENTS.map((seg) => {
             const total = segments?.[seg.key]?.total ?? 0;
             return (

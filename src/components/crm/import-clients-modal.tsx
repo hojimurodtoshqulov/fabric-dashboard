@@ -52,6 +52,12 @@ function detectProvinceFromFilename(filename: string): ProvinceGroup | null {
 }
 
 // ── Field definitions ─────────────────────────────────────────────────────────
+interface ImportResult {
+  created: number; updated: number; skipped: number;
+  skippedOneC: number; onecMatches: { row: number; name: string; onecName: string }[];
+  queuedForReview: number;
+}
+
 type FieldKey = "name" | "phone" | "company" | "email" | "region" | "status" | "notes";
 
 const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
@@ -103,7 +109,7 @@ type Step = "upload" | "mapping" | "preview" | "done";
 
 const EMPTY_ROW = (): ParsedRow => ({
   name: "", phone: "", company: "", email: "",
-  region: "", status: "ACTIVE", notes: "", _rowNum: 0,
+  region: "", status: "PROSPECT", notes: "", _rowNum: 0,
 });
 
 export function ImportClientsModal({ open, onOpenChange }: Props) {
@@ -119,7 +125,7 @@ export function ImportClientsModal({ open, onOpenChange }: Props) {
   const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
   const [mapping, setMapping] = useState<Record<string, FieldKey | "skip">>({});
   const [rows, setRows] = useState<ParsedRow[]>([]);
-  const [result, setResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
 
   const errorRows  = rows.filter(r => r._error);
   const normalRows = rows.filter(r => !r._error);
@@ -222,7 +228,7 @@ export function ImportClientsModal({ open, onOpenChange }: Props) {
       return json.data as { created: number; skipped: number };
     },
     onSuccess: (data) => {
-      setResult(data as { created: number; updated: number; skipped: number }); setStep("done");
+      setResult(data as ImportResult); setStep("done");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       queryClient.invalidateQueries({ queryKey: ["client-regions"] });
       queryClient.invalidateQueries({ queryKey: ["client-districts"] });
@@ -520,6 +526,24 @@ export function ImportClientsModal({ open, onOpenChange }: Props) {
                   <p className="text-slate-400 text-xs mt-1">O'tkazildi (mavjud)</p>
                 </div>
               </div>
+              {result.queuedForReview > 0 && (
+                <div className="bg-indigo-900/20 border border-indigo-800 rounded-xl p-3 text-sm text-indigo-300">
+                  {result.queuedForReview} ta mijoz 1C dagi mijozga o'xshaydi — &quot;Dublikatlar&quot; sahifasida tasdiqlang.
+                  Tasdiqlanmaguncha ularga potensial kampaniya yuborilmaydi.
+                </div>
+              )}
+              {result.skippedOneC > 0 && (
+                <div className="bg-amber-900/20 border border-amber-800 rounded-xl p-4 space-y-2">
+                  <p className="text-amber-300 text-sm font-medium">
+                    {result.skippedOneC} ta mijoz 1C da faol mijoz sifatida bor — potensial ro'yxatga qo'shilmadi
+                  </p>
+                  <ul className="text-xs text-slate-400 space-y-0.5 max-h-32 overflow-y-auto">
+                    {result.onecMatches.map(m => (
+                      <li key={m.row}>{m.row}-qator: {m.name} → <span className="text-slate-300">{m.onecName}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

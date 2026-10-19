@@ -293,20 +293,31 @@ export function detectProvince(region: string): ProvinceGroup | null {
   return null;
 }
 
+/** Pseudo-province for clients whose province is not known (most 1C clients). */
+export const UNKNOWN_PROVINCE_KEY = "nomalum";
+
 /** Prisma where sharti — viloyat bo'yicha filter (CONTAINS) */
 export function buildProvinceWhere(key: string) {
+  if (key === UNKNOWN_PROVINCE_KEY) return { province: null };
   const p = PROVINCE_GROUPS.find(g => g.key === key);
   if (!p) return undefined;
 
-  const orConditions = p.keywords.map(k => ({
-    region: { contains: k, mode: "insensitive" as const },
-  }));
+  // The province column is authoritative when set (1C sync, imports);
+  // older rows only have free-text region.
+  const orConditions: Record<string, unknown>[] = [
+    { province: key },
+    ...p.keywords.map(k => ({
+      province: null,
+      region: { contains: k, mode: "insensitive" as const },
+    })),
+  ];
 
   // Toshkent shahri — toshkent_vil keywordslarini istisno qilamiz
   if (key === "toshkent_sh") {
     const tVil = PROVINCE_GROUPS.find(g => g.key === "toshkent_vil");
     if (tVil) {
       const notConditions = tVil.keywords.map(k => ({
+        province: null,
         region: { contains: k, mode: "insensitive" as const },
       }));
       return {

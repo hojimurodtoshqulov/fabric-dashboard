@@ -106,6 +106,7 @@ export const SEGMENT_TEMPLATE_TYPES: Record<string, string[]> = {
   doimiy:     ["BONUS_OFFER", "NEW_CAMPAIGN", "PAYMENT_CONFIRMATION", "CUSTOM"],
   qarzdor:    ["DEBT_DUE_SOON", "DEBT_OVERDUE", "PAYMENT_CONFIRMATION", "CUSTOM"],
   yoqotilgan: ["LOST_CLIENT_REACTIVATION", "CUSTOM"],
+  potensial:  ["PROSPECT_INTRO", "NEW_CAMPAIGN", "CUSTOM"],
   yangi:      ["PROSPECT_INTRO", "NEW_CAMPAIGN", "CUSTOM"],
 };
 

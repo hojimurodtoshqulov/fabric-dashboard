@@ -1,50 +1,49 @@
 import { requirePermission } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import { apiSuccess, handleApiError } from "@/lib/utils/api";
-import { PROVINCE_GROUPS } from "@/lib/provinces";
+import { PROVINCE_GROUPS, UNKNOWN_PROVINCE_KEY } from "@/lib/provinces";
+import { clientCategory } from "@/lib/clients/category";
+import type { ClientSource, ClientStatus } from "@prisma/client";
 
-type RawGroup = { province: string | null; status: string; count: bigint };
+type RawGroup = { province: string | null; source: ClientSource; status: ClientStatus; count: bigint };
+type Stats = { total: number; faol: number; qarzdor: number; potensial: number; yangi: number };
+
+const empty = (): Stats => ({ total: 0, faol: 0, qarzdor: 0, potensial: 0, yangi: 0 });
+
+function add(s: Stats, g: RawGroup) {
+  const n = Number(g.count);
+  const cat = clientCategory(g.source, g.status);
+  s.total += n;
+  if (cat === "qarzdor") { s.qarzdor += n; s.faol += n; } // debtors are faol too
+  else s[cat] += n;
+}
 
 export async function GET() {
   try {
     await requirePermission("clients:read");
 
-    // $queryRaw — Prisma client province tipini bilmasa ham ishlaydi
     const groups = await db.$queryRaw<RawGroup[]>`
-      SELECT province, status, COUNT(*)::bigint as count
+      SELECT province, source, status, COUNT(*)::bigint AS count
       FROM clients
-      WHERE province IS NOT NULL
-      GROUP BY province, status
+      GROUP BY province, source, status
     `;
 
-    const total = await db.client.count();
-
-    type Stats = { total: number; active: number; inactive: number; debtor: number; lost: number; prospect: number };
-
-    const map = new Map<string, Stats>(
-      PROVINCE_GROUPS.map(p => [p.key, { total: 0, active: 0, inactive: 0, debtor: 0, lost: 0, prospect: 0 }])
-    );
+    const totals = empty();
+    const unknown = empty();
+    const map = new Map<string, Stats>(PROVINCE_GROUPS.map(p => [p.key, empty()]));
 
     for (const g of groups) {
-      if (!g.province) continue;
-      const entry = map.get(g.province);
-      if (!entry) continue;
-      const n = Number(g.count);
-      entry.total    += n;
-      if (g.status === "ACTIVE")   entry.active   += n;
-      if (g.status === "INACTIVE") entry.inactive += n;
-      if (g.status === "DEBTOR")   entry.debtor   += n;
-      if (g.status === "LOST")     entry.lost     += n;
-      if (g.status === "PROSPECT") entry.prospect += n;
+      add(totals, g);
+      add((g.province && map.get(g.province)) || unknown, g);
     }
 
-    const regions = PROVINCE_GROUPS.map(p => ({
-      key: p.key,
-      label: p.label,
-      ...map.get(p.key)!,
-    })).sort((a, b) => b.total - a.total);
+    const regions = PROVINCE_GROUPS.map(p => ({ key: p.key, label: p.label, ...map.get(p.key)! }))
+      .sort((a, b) => b.total - a.total);
+    if (unknown.total > 0) {
+      regions.push({ key: UNKNOWN_PROVINCE_KEY, label: "Viloyati noma'lum", ...unknown });
+    }
 
-    return apiSuccess({ total, regions });
+    return apiSuccess({ total: totals.total, totals, regions });
   } catch (e) {
     return handleApiError(e);
   }

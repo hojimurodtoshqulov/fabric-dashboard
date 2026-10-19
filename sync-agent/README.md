@@ -54,23 +54,35 @@ node index.js
 node index.js --status
 ```
 
-## Windows Task Scheduler orqali avtomatlashtirish
+## Har kuni ertalab avtomatik ishlatish
 
-1. **Task Scheduler** oching (Win + R → `taskschd.msc`)
-2. **Create Basic Task** bosting
-3. **Name**: `Selxozmash 1C Sync`
-4. **Trigger**: Daily, keyin "Repeat task every: 30 minutes"
-5. **Action**: Start a program
-   - Program: `C:\Windows\System32\cmd.exe`
-   - Arguments: `/c "cd /d C:\path\to\sync-agent && node index.js >> logs\sync.log 2>&1"`
-6. **Finish**
+`.env` ichida vaqtni belgilang (standart `07:00`):
 
-## Loglash
+```env
+SYNC_TIME=07:00
+```
+
+Keyin `install-schedule.bat` ni ikki marta bosing. U Windows Task Scheduler'da
+**"Selxozmash 1C Sync"** vazifasini yaratadi:
+
+- har kuni `SYNC_TIME` da ishga tushadi
+- kompyuter o'sha paytda o'chiq bo'lsa — yoqilgandan keyin darhol ishlaydi
+- internet yo'q bo'lsa — kutadi
+- xato bo'lsa — agent o'zi 3 marta (10 daqiqa oraliq bilan) qayta urinadi
+
+Vaqtni o'zgartirish: `.env` dagi `SYNC_TIME` ni o'zgartirib, `install-schedule.bat` ni qayta ishga tushiring.
 
 ```bat
-mkdir logs
-node index.js >> logs\sync.log 2>&1
+schtasks /run /tn "Selxozmash 1C Sync"   :: hozir qo'lda ishga tushirish
+install-schedule.bat -Remove             :: vazifani o'chirish
 ```
+
+> Vazifa foydalanuvchi tizimga kirgan paytda ishlaydi. Zavod PC'si
+> doim shu foydalanuvchi bilan kirgan holda tursin.
+
+## Loglar
+
+Har bir ishga tushish `logs\sync-YYYY-MM-DD.log` ga yoziladi. 30 kundan eski loglar avtomatik o'chiriladi.
 
 ## Muammolar
 

@@ -12,6 +12,16 @@ import { Phone, MessageSquare, Eye, Search, Filter, Pencil } from "lucide-react"
 import Link from "next/link";
 import type { ClientStatus } from "@/constants";
 import { EditClientModal, type ClientData } from "@/components/crm/edit-client-modal";
+import { SOURCE_LABELS, type ClientCategory } from "@/lib/clients/category";
+import type { ClientSource } from "@prisma/client";
+
+const SOURCE_CLASS: Partial<Record<ClientSource, string>> = {
+  ONEC:      "bg-green-500/10 text-green-300 border-green-800",
+  WEBSITE:   "bg-emerald-500/10 text-emerald-300 border-emerald-800",
+  INSTAGRAM: "bg-pink-500/10 text-pink-300 border-pink-800",
+  TELEGRAM:  "bg-sky-500/10 text-sky-300 border-sky-800",
+  WALK_IN:   "bg-amber-500/10 text-amber-300 border-amber-800",
+};
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   ACTIVE:     { label: "Faol",         className: "bg-green-500/10 text-green-400 border-green-800" },
@@ -31,6 +41,7 @@ type ClientRow = {
   email: string | null;
   region: string | null;
   status: ClientStatus;
+  source: ClientSource;
   notes?: string | null;
   segment: { name: string; color: string } | null;
   assignedTo: { name: string } | null;
@@ -41,20 +52,22 @@ type ClientRow = {
 interface ClientsTableProps {
   provinceKey?: string;
   exactRegion?: string;
+  category?: ClientCategory;
 }
 
-export function ClientsTable({ provinceKey, exactRegion }: ClientsTableProps) {
+export function ClientsTable({ provinceKey, exactRegion, category }: ClientsTableProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [editClient, setEditClient] = useState<ClientData | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", page, search, status, provinceKey, exactRegion],
+    queryKey: ["clients", page, search, status, provinceKey, exactRegion, category],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (search) params.set("search", search);
       if (status !== "all") params.set("status", status);
+      if (category) params.set("category", category);
       if (exactRegion) params.set("region", exactRegion);
       else if (provinceKey) params.set("province", provinceKey);
       const res = await fetch(`/api/clients?${params}`);
@@ -104,6 +117,7 @@ export function ClientsTable({ provinceKey, exactRegion }: ClientsTableProps) {
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Mijoz</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Telefon</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Holat</th>
+                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Manba</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Hudud</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Faktura</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Mas'ul</th>
@@ -114,14 +128,14 @@ export function ClientsTable({ provinceKey, exactRegion }: ClientsTableProps) {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-800/50">
-                      <td colSpan={7} className="px-4 py-4">
+                      <td colSpan={8} className="px-4 py-4">
                         <div className="h-4 bg-slate-800 rounded animate-pulse" />
                       </td>
                     </tr>
                   ))
                 ) : data?.clients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
                       Mijozlar topilmadi
                     </td>
                   </tr>
@@ -136,11 +150,18 @@ export function ClientsTable({ provinceKey, exactRegion }: ClientsTableProps) {
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-300 font-mono text-xs">
-                        {client.phone}
+                        {client.phone.startsWith("+998000") || client.phone.startsWith("NOPHONE_")
+                          ? <span className="text-slate-600 font-sans">telefon yo'q</span>
+                          : client.phone}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={STATUS_CONFIG[client.status]?.className}>
                           {STATUS_CONFIG[client.status]?.label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={SOURCE_CLASS[client.source] ?? "bg-slate-500/10 text-slate-400 border-slate-700"}>
+                          {SOURCE_LABELS[client.source]}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-slate-400">{client.region || "—"}</td>
