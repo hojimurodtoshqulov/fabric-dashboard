@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Factory } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Logo } from "@/components/shared/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,9 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md px-4">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-500 p-2.5 rounded-xl">
-              <Factory className="h-7 w-7 text-white" />
-            </div>
+            <Logo size={64} priority />
             <div>
               <h1 className="text-2xl font-bold text-white">Selxozmash</h1>
               <p className="text-slate-400 text-sm">Boshqaruv Tizimi</p>

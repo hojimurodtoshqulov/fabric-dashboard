@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils/cn";
 import {
   LayoutDashboard, Users, ShoppingCart, CreditCard,
   Phone, MessageSquare, BarChart3, Megaphone,
-  Globe, CheckSquare, Bell, Settings, Factory, Warehouse,
+  Globe, CheckSquare, Bell, Settings, Warehouse,
   ChevronLeft, ChevronRight, Building2,
 } from "lucide-react";
 import { useState } from "react";
+import { Logo } from "@/components/shared/logo";
 
 const NAV_ITEMS = [
   { href: "/overview", label: "Bosh sahifa", icon: LayoutDashboard },
@@ -41,9 +42,7 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 p-4 border-b border-slate-800">
-        <div className="bg-indigo-600 p-2 rounded-lg flex-shrink-0">
-          <Factory className="h-5 w-5 text-white" />
-        </div>
+        <Logo size={collapsed ? 32 : 40} priority />
         {!collapsed && (
           <div className="overflow-hidden">
             <p className="text-white font-bold text-sm leading-tight">Selxozmash</p>
