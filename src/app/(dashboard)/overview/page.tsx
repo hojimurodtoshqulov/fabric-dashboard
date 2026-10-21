@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { SalesChart } from "@/components/charts/sales-chart";
 import { ClientStatusChart } from "@/components/charts/client-status-chart";
+import { Money, MoneyFormatToggle } from "@/components/shared/money";
 
 export const metadata: Metadata = { title: "Bosh sahifa" };
 export const dynamic = "force-dynamic";
@@ -31,21 +32,24 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Bosh sahifa</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Bugungi holat — {new Date().toLocaleDateString("uz-UZ")}
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Bosh sahifa</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Bugungi holat — {new Date().toLocaleDateString("uz-UZ")}
+          </p>
+        </div>
+        <MoneyFormatToggle />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Jami mijozlar" value={clients.total.toLocaleString()}
           subtitle={`${clients.activeCount} faol`} icon={Users} color="indigo" />
-        <StatCard title="Bugungi savdo" value={`${(today.sales / 1_000_000).toFixed(1)}M`}
+        <StatCard title="Bugungi savdo" value={<Money amount={today.sales} />}
           subtitle={`${today.invoices} ta hisob-faktura`} icon={ShoppingCart} color="green" />
-        <StatCard title="Muddati o'tgan qarz" value={`${(debts.overdue.amount / 1_000_000).toFixed(1)}M`}
-          subtitle={`${debts.overdue.count} ta mijoz`} icon={AlertTriangle} color="red" />
-        <StatCard title="Oylik savdo" value={`${(monthly.sales / 1_000_000).toFixed(1)}M`}
+        <StatCard title="Muddati o'tgan qarz" value={<Money amount={debts.overdue.amount} />}
+          subtitle={`30 kundan oshgan qismi · ${debts.overdue.count} ta mijoz`} icon={AlertTriangle} color="red" />
+        <StatCard title="Oylik savdo" value={<Money amount={monthly.sales} />}
           subtitle={`${monthly.invoices} ta hisob-faktura`} icon={TrendingUp} color="blue" />
       </div>
 
@@ -54,8 +58,8 @@ export default async function OverviewPage() {
           subtitle={`${clients.retentionRate}% saqlanish`} icon={Users} color="green" />
         <StatCard title="Yo'qotilgan mijozlar" value={(clients.byStatus as Record<string,number>)?.LOST || 0}
           subtitle={`${clients.lostRate}% yo'qotish`} icon={Users} color="red" />
-        <StatCard title="Qarzlar jami" value={`${(debts.totalDebt / 1_000_000).toFixed(1)}M`}
-          subtitle={`${debts.recoveryRate}% qaytarilgan`} icon={CreditCard} color="yellow" />
+        <StatCard title="Jami qarz" value={<Money amount={debts.totalDebt} />}
+          subtitle="Barcha to'lanmagan qarz (muddati o'tgan + o'tmagan)" icon={CreditCard} color="yellow" />
         <StatCard title="Faol vazifalar" value={tasks["IN_PROGRESS"] || 0}
           subtitle={`${tasks["TODO"] || 0} kutmoqda`} icon={CheckSquare} color="purple" />
       </div>
@@ -98,8 +102,7 @@ export default async function OverviewPage() {
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h3 className="text-slate-400 text-sm font-medium">Bugungi to'lovlar</h3>
-          <p className="text-2xl font-bold text-white mt-2">{(today.paid / 1_000_000).toFixed(2)}M</p>
-          <p className="text-slate-500 text-xs mt-1">so'm</p>
+          <p className="text-2xl font-bold text-white mt-2"><Money amount={today.paid} /></p>
         </div>
       </div>
     </div>

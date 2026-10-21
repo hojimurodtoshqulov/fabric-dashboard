@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils/cn";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
   title: string;
-  value: string | number;
+  value: ReactNode;
   subtitle?: string;
   icon: LucideIcon;
   trend?: { value: number; label: string };
@@ -41,7 +42,8 @@ export function StatCard({
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-slate-400 text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1 truncate">{value}</p>
+          {/* wraps instead of truncating — "6 mlrd 440 mln so'm" must be readable in full */}
+          <p className="text-2xl font-bold text-white mt-1 leading-tight break-words">{value}</p>
           {subtitle && (
             <p className="text-slate-500 text-xs mt-1">{subtitle}</p>
           )}

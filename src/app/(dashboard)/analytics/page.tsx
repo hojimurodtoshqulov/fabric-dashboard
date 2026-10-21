@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { StatCard } from "@/components/shared/stat-card";
+import { Money, MoneyFormatToggle } from "@/components/shared/money";
 import { BarChart3, TrendingUp, Users, CreditCard, MapPin, Award, Building2, AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Analitika" };
@@ -18,9 +19,12 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Analitika</h1>
-        <p className="text-slate-400 text-sm mt-1">Biznes ko'rsatkichlari</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Analitika</h1>
+          <p className="text-slate-400 text-sm mt-1">Biznes ko'rsatkichlari</p>
+        </div>
+        <MoneyFormatToggle />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -46,7 +50,7 @@ export default async function AnalyticsPage() {
                   <p className="text-slate-500 text-xs">{product.orderCount} ta buyurtma</p>
                 </div>
                 <span className="text-green-400 text-sm font-medium">
-                  {(product.totalRevenue / 1_000_000).toFixed(1)}M
+                  <Money amount={product.totalRevenue} />
                 </span>
               </div>
             ))}
@@ -71,7 +75,7 @@ export default async function AnalyticsPage() {
                   <p className="text-slate-500 text-xs">{region.clients} ta mijoz</p>
                 </div>
                 <span className="text-green-400 text-sm font-medium">
-                  {(region.revenue / 1_000_000).toFixed(1)}M
+                  <Money amount={region.revenue} />
                 </span>
               </div>
             ))}
@@ -100,7 +104,7 @@ export default async function AnalyticsPage() {
                   </p>
                 </div>
                 <span className="text-green-400 text-sm font-medium">
-                  {(mgr.revenue / 1_000_000).toFixed(1)}M
+                  <Money amount={mgr.revenue} />
                 </span>
               </div>
             ))}
@@ -130,7 +134,7 @@ export default async function AnalyticsPage() {
                   <span className="text-slate-600 text-xs">({data.count})</span>
                 </div>
                 <span className={`text-sm font-medium ${color}`}>
-                  {(data.amount / 1_000_000).toFixed(2)}M
+                  <Money amount={data.amount} />
                 </span>
               </div>
             ))}
@@ -159,17 +163,13 @@ export default async function AnalyticsPage() {
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500">Daromad</span>
                     <span className="text-green-400 font-medium">
-                      {stat.totalRevenue >= 1_000_000
-                        ? `${(stat.totalRevenue / 1_000_000).toFixed(1)}M`
-                        : `${Math.round(stat.totalRevenue / 1_000)}K`} so'm
+                      <Money amount={stat.totalRevenue} />
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500">To'langan</span>
                     <span className="text-blue-400 font-medium">
-                      {stat.totalPaid >= 1_000_000
-                        ? `${(stat.totalPaid / 1_000_000).toFixed(1)}M`
-                        : `${Math.round(stat.totalPaid / 1_000)}K`} so'm
+                      <Money amount={stat.totalPaid} />
                     </span>
                   </div>
                   {stat.overdueDebts > 0 && (
@@ -179,9 +179,7 @@ export default async function AnalyticsPage() {
                         Muddati o'tgan
                       </span>
                       <span className="text-red-400 font-medium">
-                        {stat.overdueAmount >= 1_000_000
-                          ? `${(stat.overdueAmount / 1_000_000).toFixed(1)}M`
-                          : `${Math.round(stat.overdueAmount / 1_000)}K`} so'm
+                        <Money amount={stat.overdueAmount} />
                       </span>
                     </div>
                   )}

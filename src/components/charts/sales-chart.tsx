@@ -7,6 +7,8 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useMoneyFormat } from "@/components/shared/money";
+import { formatSum, formatSumAxis } from "@/lib/utils/money";
 
 const periods = [
   { label: "Kunlik", value: "daily" },
@@ -19,6 +21,7 @@ type Period = (typeof periods)[number]["value"];
 
 export function SalesChart() {
   const [period, setPeriod] = useState<Period>("monthly");
+  const [moneyFormat] = useMoneyFormat();
 
   const { data, isLoading } = useQuery({
     queryKey: ["sales-chart", period],
@@ -57,12 +60,12 @@ export function SalesChart() {
             <YAxis
               stroke="#64748b"
               tick={{ fontSize: 11 }}
-              tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`}
+              tickFormatter={(v) => formatSumAxis(Number(v))}
             />
             <Tooltip
               contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px" }}
               labelStyle={{ color: "#94a3b8" }}
-              formatter={(value) => [`${(Number(value) / 1_000_000).toFixed(2)}M so'm`, ""]}
+              formatter={(value) => [formatSum(Number(value), moneyFormat), ""]}
             />
             <Legend />
             <Line

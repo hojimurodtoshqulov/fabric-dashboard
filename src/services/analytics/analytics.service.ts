@@ -126,11 +126,29 @@ export class AnalyticsService {
   }
 
   async getDebtStats() {
-    const [pending, overdue, paid, partial] = await Promise.all([
+    const [pending, overdue, paid, partial, overduePart] = await Promise.all([
       db.debt.aggregate({ where: { status: "PENDING" }, _sum: { amount: true }, _count: true }),
       db.debt.aggregate({ where: { status: "OVERDUE" }, _sum: { amount: true }, _count: true }),
       db.debt.aggregate({ where: { status: "PAID" }, _sum: { amount: true }, _count: true }),
       db.debt.aggregate({ where: { status: "PARTIAL" }, _sum: { amount: true }, _count: true }),
+      // Only the part older than 30 days is overdue. A 1C debt is one balance per client
+      // split into aging buckets; a client with an old invoice is OVERDUE as a whole, but
+      // its fresh 0–30 day invoices are not late yet.
+      db.$queryRaw<{ amount: number | null; clients: number }[]>`
+        SELECT SUM(late)::float8 AS amount, COUNT(DISTINCT "clientId")::int AS clients
+        FROM (
+          SELECT "clientId",
+            CASE WHEN "syncSource" = '1c'
+              THEN COALESCE("days31to60", 0) + COALESCE("days61to90", 0)
+                 + COALESCE("days91to100", 0) + COALESCE("daysOver100", 0)
+              ELSE amount - "paidAmount"
+            END AS late
+          FROM debts
+          WHERE status IN ('OVERDUE', 'PARTIAL', 'PENDING')
+            AND ("syncSource" = '1c' OR status = 'OVERDUE')
+        ) d
+        WHERE late > 0
+      `,
     ]);
 
     const totalDebt =
@@ -143,8 +161,7 @@ export class AnalyticsService {
       totalDebt,
       totalRecovered,
       pending: { amount: Number(pending._sum.amount || 0), count: pending._count },
-      overdue: { amount: Number(overdue._sum.amount || 0), count: overdue._count },
-      paid: { amount: Number(paid._sum.amount || 0), count: paid._count },
+      overdue: { amount: Number(overduePart[0]?.amount ?? 0), count: overduePart[0]?.clients ?? 0 },      paid: { amount: Number(paid._sum.amount || 0), count: paid._count },
       partial: { amount: Number(partial._sum.amount || 0), count: partial._count },
       recoveryRate:
         totalDebt + totalRecovered > 0
