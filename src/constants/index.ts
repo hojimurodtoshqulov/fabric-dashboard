@@ -2,9 +2,25 @@ export const ROLES = {
   DIRECTOR: "DIRECTOR",
   MANAGER: "MANAGER",
   WORKER: "WORKER",
+  FOREMAN: "FOREMAN",
+  ACCOUNTANT: "ACCOUNTANT",
+  WAREHOUSE: "WAREHOUSE",
 } as const;
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
+
+export function isRoleName(v: unknown): v is RoleName {
+  return Object.values(ROLES).includes(v as RoleName);
+}
+
+export const ROLE_LABELS: Record<RoleName, { label: string; description: string }> = {
+  DIRECTOR:   { label: "Direktor (ega)",       description: "Hamma narsa, jumladan foyda hisobi" },
+  MANAGER:    { label: "Sotuv menejeri",       description: "Mijozlar, savdo, qo'ng'iroqlar, marketing" },
+  WORKER:     { label: "Xodim",                description: "Vazifalar va mijozlar bilan aloqa" },
+  FOREMAN:    { label: "Ish boshqaruvchi",     description: "Xodimlar, davomat, ishbay ishlar, ombor (ko'rish)" },
+  ACCOUNTANT: { label: "Buxgalter",            description: "Oylik, xarajatlar, savdo va qarzlar" },
+  WAREHOUSE:  { label: "Ombor nazoratchisi",   description: "Ombor: kirim, chiqim, qoldiq, ishlab chiqarish" },
+};
 
 export const CLIENT_STATUSES = {
   ACTIVE: "ACTIVE",
@@ -167,6 +183,21 @@ export const PERMISSIONS = {
   // Website
   WEBSITE_READ: "website:read",
   WEBSITE_UPDATE: "website:update",
+  // Warehouse
+  WAREHOUSE_READ: "warehouse:read",
+  WAREHOUSE_UPDATE: "warehouse:update",
+  // Employees (HR)
+  EMPLOYEES_READ: "employees:read",
+  EMPLOYEES_UPDATE: "employees:update",
+  ATTENDANCE_UPDATE: "attendance:update",
+  // Payroll — salary amounts
+  PAYROLL_READ: "payroll:read",
+  PAYROLL_UPDATE: "payroll:update",
+  // Expenses
+  EXPENSES_READ: "expenses:read",
+  EXPENSES_UPDATE: "expenses:update",
+  // Profit & loss — owner only
+  FINANCE_PROFIT: "finance:profit",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -193,6 +224,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.CALLS_CREATE,
     PERMISSIONS.WEBSITE_READ,
     PERMISSIONS.WEBSITE_UPDATE,
+    PERMISSIONS.WAREHOUSE_READ,
   ],
   WORKER: [
     PERMISSIONS.CLIENTS_READ,
@@ -202,5 +234,36 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.MESSAGES_READ,
     PERMISSIONS.MESSAGES_SEND,
     PERMISSIONS.CALLS_READ,
+  ],
+  // Runs the shop floor: people, attendance, piecework. No salary amounts, no money.
+  FOREMAN: [
+    PERMISSIONS.TASKS_READ,
+    PERMISSIONS.TASKS_CREATE,
+    PERMISSIONS.TASKS_UPDATE,
+    PERMISSIONS.WAREHOUSE_READ,
+    PERMISSIONS.EMPLOYEES_READ,
+    PERMISSIONS.EMPLOYEES_UPDATE,
+    PERMISSIONS.ATTENDANCE_UPDATE,
+  ],
+  ACCOUNTANT: [
+    PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.SALES_READ,
+    PERMISSIONS.SALES_CREATE,
+    PERMISSIONS.SALES_UPDATE,
+    PERMISSIONS.ANALYTICS_READ,
+    PERMISSIONS.TASKS_READ,
+    PERMISSIONS.TASKS_UPDATE,
+    PERMISSIONS.WAREHOUSE_READ,
+    PERMISSIONS.EMPLOYEES_READ,
+    PERMISSIONS.PAYROLL_READ,
+    PERMISSIONS.PAYROLL_UPDATE,
+    PERMISSIONS.EXPENSES_READ,
+    PERMISSIONS.EXPENSES_UPDATE,
+  ],
+  WAREHOUSE: [
+    PERMISSIONS.TASKS_READ,
+    PERMISSIONS.TASKS_UPDATE,
+    PERMISSIONS.WAREHOUSE_READ,
+    PERMISSIONS.WAREHOUSE_UPDATE,
   ],
 };

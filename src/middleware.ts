@@ -1,8 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ROLE_PERMISSIONS } from "@/constants";
-import type { Permission, RoleName } from "@/constants";
+import { missingPermission, homeFor } from "@/lib/auth/access";
 
 // Lightweight NextAuth instance for Edge — no Prisma, no bcrypt
 const { auth } = NextAuth({
@@ -25,21 +24,6 @@ const { auth } = NextAuth({
 const PUBLIC_ROUTES = ["/login", "/api/auth", "/api/public", "/api/leads", "/api/1c"];
 const API_PREFIX = "/api";
 
-const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
-  "/api/clients":   ["clients:read"],
-  "/api/invoices":  ["sales:read"],
-  "/api/payments":  ["sales:read"],
-  "/api/debts":     ["sales:read"],
-  "/api/calls":     ["calls:read"],
-  "/api/messages":  ["messages:read"],
-  "/api/analytics": ["analytics:read"],
-  "/api/marketing": ["marketing:read"],
-  "/api/website":   ["website:read"],
-  "/api/tasks":     ["tasks:read"],
-  "/api/settings":  ["settings:read"],
-  "/api/users":     ["users:read"],
-};
-
 export default auth(async (req: NextRequest & { auth: { user?: { id: string; role: string; permissions?: string[] } } | null }) => {
   const { pathname } = req.nextUrl;
 
@@ -56,22 +40,18 @@ export default auth(async (req: NextRequest & { auth: { user?: { id: string; rol
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const userRole = session.user.role as RoleName;
-  const userPerms = ROLE_PERMISSIONS[userRole] || [];
+  const userRole = session.user.role;
 
-  const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find((route) =>
-    pathname.startsWith(route)
-  );
-
-  if (matchedRoute) {
-    const required = ROUTE_PERMISSIONS[matchedRoute];
-    const hasAccess = required.some((p) => userPerms.includes(p as Permission));
-    if (!hasAccess) {
-      if (pathname.startsWith(API_PREFIX)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      return NextResponse.redirect(new URL("/overview", req.url));
+  // Permissions come from the role at request time (not the login token),
+  // so a role change takes effect without signing out.
+  if (missingPermission(userRole, pathname, req.method)) {
+    if (pathname.startsWith(API_PREFIX)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    return NextResponse.redirect(new URL(homeFor(userRole), req.url));
+  }
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL(homeFor(userRole), req.url));
   }
 
   const response = NextResponse.next();

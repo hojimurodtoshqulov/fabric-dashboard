@@ -7,8 +7,9 @@ import {
   LayoutDashboard, Users, ShoppingCart, CreditCard,
   Phone, MessageSquare, BarChart3, Megaphone,
   Globe, CheckSquare, Bell, Settings, Warehouse,
-  ChevronLeft, ChevronRight, Building2,
+  ChevronLeft, ChevronRight, Building2, HardHat, Wallet, Receipt, PiggyBank,
 } from "lucide-react";
+import { canOpen } from "@/lib/auth/access";
 import { useState } from "react";
 import { Logo } from "@/components/shared/logo";
 
@@ -19,6 +20,10 @@ const NAV_ITEMS = [
   { href: "/sales/invoices", label: "Savdo", icon: ShoppingCart },
   { href: "/sales/debts", label: "Qarzlar", icon: CreditCard },
   { href: "/warehouse", label: "Omborxona", icon: Warehouse },
+  { href: "/hr", label: "Xodimlar", icon: HardHat },
+  { href: "/hr/payroll", label: "Oylik", icon: Wallet },
+  { href: "/finance", label: "Xarajatlar", icon: Receipt },
+  { href: "/finance/profit", label: "Foyda hisobi", icon: PiggyBank },
   { href: "/ai-calls", label: "AI Qo'ng'iroqlar", icon: Phone },
   { href: "/messages", label: "Xabarlar", icon: MessageSquare },
   { href: "/analytics", label: "Analitika", icon: BarChart3 },
@@ -29,8 +34,13 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Sozlamalar", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ role }: { role?: string }) {
+  const items = NAV_ITEMS.filter((item) => canOpen(role, item.href));
   const pathname = usePathname();
+  // Most specific match wins, so /hr/payroll doesn't also light up /hr
+  const activeHref = items
+    .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -53,10 +63,8 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/overview" && pathname.startsWith(item.href));
+        {items.map((item) => {
+          const isActive = item.href === activeHref;
           return (
             <Link
               key={item.href}

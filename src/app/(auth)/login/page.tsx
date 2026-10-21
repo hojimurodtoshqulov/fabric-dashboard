@@ -29,7 +29,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError("Email yoki parol noto'g'ri");
+      setError("Login yoki parol noto'g'ri");
       setLoading(false);
     } else {
       router.push("/overview");
@@ -64,15 +64,17 @@ export default function LoginPage() {
                 </Alert>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">Email</Label>
+                <Label htmlFor="email" className="text-slate-300">Login yoki email</Label>
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
+                  autoCapitalize="none"
+                  autoComplete="username"
                   required
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
-                  placeholder="email@fabrika.uz"
+                  placeholder="login yoki email@fabrika.uz"
                 />
               </div>
               <div className="space-y-2">
