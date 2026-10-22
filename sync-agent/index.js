@@ -175,18 +175,22 @@ async function main() {
 
   cleanupOldLogs();
 
+  // Defaults keep this file working with an older src/config.js that has no retry settings.
+  const retryCount = config.retryCount || 3;
+  const retryDelayMin = config.retryDelayMin ?? 10;
+
   // 1C may be locked (backup, users exiting) or the network may be down in
   // the early morning — retry a few times before giving up.
-  for (let attempt = 1; attempt <= config.retryCount; attempt++) {
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
       await runSync(config);
       return;
     } catch (e) {
-      err(`Attempt ${attempt}/${config.retryCount} failed: ${e.message || String(e)}`);
+      err(`Attempt ${attempt}/${retryCount} failed: ${e.message || String(e)}`);
       if (e.stack) writeLog(e.stack);
-      if (attempt < config.retryCount) {
-        log(`Retrying in ${config.retryDelayMin} min...`);
-        await sleep(config.retryDelayMin * 60 * 1000);
+      if (attempt < retryCount) {
+        log(`Retrying in ${retryDelayMin} min...`);
+        await sleep(retryDelayMin * 60 * 1000);
       }
     }
   }
