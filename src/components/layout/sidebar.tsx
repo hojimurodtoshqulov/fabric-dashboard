@@ -62,7 +62,7 @@ export function Sidebar({ role }: { role?: string }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto no-scrollbar">
         {items.map((item) => {
           const isActive = item.href === activeHref;
           return (
