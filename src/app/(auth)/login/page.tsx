@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", password: "" });
 
@@ -79,15 +80,27 @@ export default function LoginPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-slate-300">Parol</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={form.password}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={form.password}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    className="bg-slate-700 border-slate-600 text-white pr-10"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                    aria-label={showPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                    title={showPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </CardContent>
             <CardFooter>
