@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { apiSuccess, apiError, handleApiError } from "@/lib/utils/api";
-import { processSyncPayload, closeDebtsMissingFromRun, type SyncPayload } from "@/lib/sync/onec.service";
+import { processSyncPayload, closeDebtsMissingFromRun, removeCashFlowsMissingFromRun, type SyncPayload } from "@/lib/sync/onec.service";
 import { db } from "@/lib/db";
 
 // A batch of ~100 records takes about a minute (several queries per record).
@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
     if (!isValidApiKey(req)) return apiError("Unauthorized", 401);
 
     const body = (await req.json()) as SyncPayload;
-    if (!body.sales?.length && !body.debts?.length && !body.final) {
-      return apiError("Payload must include sales or debts array", 400);
+    if (!body.sales?.length && !body.debts?.length && !body.cashFlows?.length && !body.final) {
+      return apiError("Payload must include sales, debts or cashFlows array", 400);
     }
 
     const syncId = `sync_${Date.now().toString(36)}`;
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
           status          = ${status},
           "salesCount"    = ${result.salesSynced},
           "debtsCount"    = ${result.debtsSynced},
+          "cashFlowsCount"= ${result.cashFlowsSynced},
           "clientsCreated"= ${result.clientsCreated},
           "clientsUpdated"= ${result.clientsUpdated},
           error           = ${result.errors.length ? result.errors.slice(0, 20).join("\n") : null},
@@ -52,7 +53,11 @@ export async function POST(req: NextRequest) {
         debtsClosed = await closeDebtsMissingFromRun(runId);
         await db.$executeRaw`UPDATE onec_syncs SET "debtsClosed" = ${debtsClosed} WHERE id = ${syncId}`;
       }
-      return apiSuccess({ syncId, runId, debtsClosed, ...result });
+      let cashFlowsRemoved = 0;
+      if (body.final && runId && body.cashFrom && !Number.isNaN(Date.parse(body.cashFrom))) {
+        cashFlowsRemoved = await removeCashFlowsMissingFromRun(runId, body.cashFrom);
+      }
+      return apiSuccess({ syncId, runId, debtsClosed, cashFlowsRemoved, ...result });
     } catch (syncErr) {
       const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
       await db.$executeRaw`

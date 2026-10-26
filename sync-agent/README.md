@@ -7,6 +7,7 @@
 - **Savdo**: `Реализация товаров и услуг` — fakturalarni o'qib, Fabric Automation'ga yuboradi
 - **Qarzdorlar**: Счет 62 balansidan qarzlarni o'qib, aging (muddatlash) hisoblaydi
 - **Mijozlar**: INN/PINFL orqali mavjud mijozlarni topadi, yangilarini yaratadi
+- **Kirim/chiqim** (v1.2.0+): kassa (50) va bank (51, 52) schyotlaridagi provodkalarni o'qiydi. Kirim/chiqim, kassa/bank va turi (mijoz to'lovi, yetkazib beruvchi, ish haqi, soliq, xarajat) serverda schyot kodlari bo'yicha aniqlanadi. Kassa↔bank o'tkazmalari hisobga olinmaydi. O'qishda xato bo'lsa, savdo va qarz sinxronizatsiyasi baribir ishlayveradi.
 
 ## Talablar
 
@@ -43,6 +44,12 @@ ONEC_PASSWORD=your_1c_password
 ```bat
 node src/test-connection.js
 ```
+
+### Kirim/chiqimni tekshirish (hech narsa yubormaydi)
+```bat
+node src/test-cashflow.js 30
+```
+So'nggi 30 kunlik provodkalarni o'qib, schyot juftliklari (masalan `Dt 50 <- Kt 62` = mijozdan naqd pul) va ularning yig'indisini chiqaradi. Birinchi sinxronizatsiyadan oldin shu ro'yxat 1C'dagi haqiqiy kassa/bank hujjatlariga mos kelishini ko'zdan kechiring.
 
 ### Bir marta ishlatish
 ```bat

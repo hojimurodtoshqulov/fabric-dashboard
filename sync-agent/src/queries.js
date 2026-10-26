@@ -152,4 +152,69 @@ function queryInvoicesForAging(conn, fromDate) {
   );
 }
 
-module.exports = { querySales, queryDebtBalances, queryInvoicesForAging };
+// ─── Cash and bank movements (kirim / chiqim) ────────────────────────────────
+
+/**
+ * Ledger entries that touch cash (50) or bank accounts (51, 52), read straight from the
+ * accounting register so it does not depend on the fields of the individual documents
+ * (ПКО, РКО, поступление / списание с расчётного счёта all end up here).
+ * Which side is money, in or out, and what it was for is decided on the server from the
+ * account codes, so that logic can change without reinstalling the agent.
+ */
+const CASH_ENTRIES_QUERY = `
+ВЫБРАТЬ
+    Пр.Период                       КАК EntryDate,
+    ПРЕДСТАВЛЕНИЕ(Пр.Регистратор)   КАК DocRef,
+    Пр.СчетДт.Код                   КАК DebitAccount,
+    Пр.СчетКт.Код                   КАК CreditAccount,
+    ПРЕДСТАВЛЕНИЕ(Пр.СубконтоДт1)   КАК DebitName,
+    Пр.СубконтоДт1.ИНН              КАК DebitInn,
+    ПРЕДСТАВЛЕНИЕ(Пр.СубконтоКт1)   КАК CreditName,
+    Пр.СубконтоКт1.ИНН              КАК CreditInn,
+    Пр.Содержание                   КАК Purpose,
+    Пр.Сумма                        КАК Amount
+ИЗ
+    РегистрБухгалтерии.Хозрасчетный КАК Пр
+ГДЕ
+    Пр.Активность = ИСТИНА
+    И Пр.Период >= &StartDate
+    И (
+        Пр.СчетДт.Код ПОДОБНО "50%" ИЛИ Пр.СчетДт.Код ПОДОБНО "51%" ИЛИ Пр.СчетДт.Код ПОДОБНО "52%"
+        ИЛИ Пр.СчетКт.Код ПОДОБНО "50%" ИЛИ Пр.СчетКт.Код ПОДОБНО "51%" ИЛИ Пр.СчетКт.Код ПОДОБНО "52%"
+    )
+УПОРЯДОЧИТЬ ПО
+    Пр.Период
+`;
+
+/**
+ * Query every posted ledger entry on cash/bank accounts from fromDate.
+ * @param {object} conn
+ * @param {Date} fromDate
+ * @returns {Array<{ date, docRef, debitAccount, creditAccount, debitName, debitInn, creditName, creditInn, purpose, amount }>}
+ */
+function queryCashEntries(conn, fromDate) {
+  return executeQuery(
+    conn,
+    CASH_ENTRIES_QUERY,
+    (sel) => {
+      const date = toJSDate(sel.EntryDate);
+      if (!date) return null;
+      const text = (v) => String(v || "").trim();
+      return {
+        date:          date.toISOString().slice(0, 10),
+        docRef:        text(sel.DocRef),
+        debitAccount:  text(sel.DebitAccount),
+        creditAccount: text(sel.CreditAccount),
+        debitName:     text(sel.DebitName),
+        debitInn:      text(sel.DebitInn),
+        creditName:    text(sel.CreditName),
+        creditInn:     text(sel.CreditInn),
+        purpose:       text(sel.Purpose),
+        amount:        Number(sel.Amount || 0),
+      };
+    },
+    (conn, query) => setDateParam(conn, query, "StartDate", fromDate)
+  );
+}
+
+module.exports = { querySales, queryDebtBalances, queryInvoicesForAging, queryCashEntries };

@@ -18,11 +18,11 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const { getConfig }                               = require("./src/config");
 const { createConnection }                        = require("./src/connection");
-const { querySales, queryDebtBalances, queryInvoicesForAging } = require("./src/queries");
-const { transformSales, transformDebts }          = require("./src/transform");
+const { querySales, queryDebtBalances, queryInvoicesForAging, queryCashEntries } = require("./src/queries");
+const { transformSales, transformDebts, transformCashFlows } = require("./src/transform");
 const { sendSync, checkStatus }                   = require("./src/api");
 
-const AGENT_VERSION = "1.1.0";
+const AGENT_VERSION = "1.2.0";
 const BATCH_SIZE = 100;
 const LOG_DIR = path.join(__dirname, "logs");
 const LOG_KEEP_DAYS = 30;
@@ -57,7 +57,7 @@ async function runStatusCheck(config) {
   if (status.lastSync) {
     const s = status.lastSync;
     log(`Last sync: ${s.status} at ${s.finishedAt || s.startedAt}`);
-    log(`  Sales: ${s.salesCount}  Debts: ${s.debtsCount}  New clients: ${s.clientsCreated}`);
+    log(`  Sales: ${s.salesCount}  Debts: ${s.debtsCount}  Cash: ${s.cashFlowsCount ?? 0}  New clients: ${s.clientsCreated}`);
     if (s.error) warn(`  Error: ${s.error}`);
   } else {
     log("No syncs recorded yet.");
@@ -93,14 +93,31 @@ async function runSync(config) {
   const agingInvoices = queryInvoicesForAging(conn, fromDate);
   log(`  Found: ${agingInvoices.length} invoices`);
 
+  // ── Step 4b: Read cash and bank movements ───────────────────────────────
+  // A failure here (e.g. a different chart of accounts) must not stop the sales and debt
+  // sync, which has been working. Without a successful read the server is told nothing
+  // about cash, so it also won't remove any cash rows.
+  let rawCash = [];
+  let cashRead = false;
+  log("Reading cash and bank movements (accounts 50, 51, 52)...");
+  try {
+    rawCash = queryCashEntries(conn, fromDate);
+    cashRead = true;
+    log(`  Found: ${rawCash.length} ledger entries`);
+  } catch (e) {
+    warn(`Cash/bank read failed, continuing without it: ${e.message || String(e)}`);
+  }
+
   // ── Step 5: Transform ────────────────────────────────────────────────────
   log("Transforming data...");
   const sales = transformSales(rawSales);
   const debts = transformDebts(rawDebts, agingInvoices);
   log(`  Sales ready:  ${sales.length}`);
   log(`  Debts ready:  ${debts.length}`);
+  const cashFlows = transformCashFlows(rawCash);
+  log(`  Cash ready:   ${cashFlows.length}`);
 
-  if (sales.length === 0 && debts.length === 0) {
+  if (sales.length === 0 && debts.length === 0 && cashFlows.length === 0) {
     warn("Nothing to sync. Check 1C data and date range.");
     return;
   }
@@ -113,22 +130,27 @@ async function runSync(config) {
   const items = [
     ...sales.map((s) => ({ kind: "sales", rec: s })),
     ...debts.map((d) => ({ kind: "debts", rec: d })),
+    ...cashFlows.map((c) => ({ kind: "cashFlows", rec: c })),
   ];
   const batches = Math.max(1, Math.ceil(items.length / BATCH_SIZE));
   log(`Sending to Fabric Automation (${batches} batches, run ${runId})...`);
 
-  const result = { salesSynced: 0, debtsSynced: 0, clientsCreated: 0, clientsUpdated: 0, debtsClosed: 0, errors: [], durationMs: 0 };
+  const result = { salesSynced: 0, debtsSynced: 0, cashFlowsSynced: 0, cashFlowsSkipped: 0, cashFlowsRemoved: 0, clientsCreated: 0, clientsUpdated: 0, debtsClosed: 0, errors: [], durationMs: 0 };
+  const cashFrom = fromDate.toISOString().slice(0, 10);
   for (let b = 0; b < batches; b++) {
     const chunk = items.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
     const payload = {
       sales: chunk.filter((i) => i.kind === "sales").map((i) => i.rec),
       debts: chunk.filter((i) => i.kind === "debts").map((i) => i.rec),
+      cashFlows: chunk.filter((i) => i.kind === "cashFlows").map((i) => i.rec),
       agentVersion: AGENT_VERSION,
       runId,
       final: b === batches - 1,
+      // Only when the whole ledger was read: lets the server drop rows 1C no longer has.
+      ...(cashRead && b === batches - 1 ? { cashFrom } : {}),
     };
     const r = await sendSync(payload, config);
-    for (const k of ["salesSynced", "debtsSynced", "clientsCreated", "clientsUpdated", "debtsClosed", "durationMs"]) {
+    for (const k of ["salesSynced", "debtsSynced", "cashFlowsSynced", "cashFlowsSkipped", "cashFlowsRemoved", "clientsCreated", "clientsUpdated", "debtsClosed", "durationMs"]) {
       result[k] += r[k] || 0;
     }
     if (r.errors?.length) result.errors.push(...r.errors);
@@ -140,6 +162,7 @@ async function runSync(config) {
   log("  SYNC COMPLETE");
   log(`  Sales synced:     ${result.salesSynced}`);
   log(`  Debts synced:     ${result.debtsSynced}`);
+  log(`  Cash synced:      ${result.cashFlowsSynced} (internal transfers skipped: ${result.cashFlowsSkipped}, removed: ${result.cashFlowsRemoved})`);
   log(`  Clients created:  ${result.clientsCreated}`);
   log(`  Clients updated:  ${result.clientsUpdated}`);
   log(`  Debts closed:     ${result.debtsClosed}${result.errors.length ? " (skipped: errors in run)" : ""}`);

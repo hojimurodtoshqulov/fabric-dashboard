@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { detectProvince } from "@/lib/provinces";
 import { pickAutoMerge, type MatchIndex, type MatchResult, type MatchTarget } from "@/lib/clients/matching";
 import { loadMergeableIndex, loadRejectedPairs } from "@/services/crm/client-merge.service";
+import { toCashFlowRows, type CashFlowRecord } from "@/lib/sync/cashflow";
 
 // ─── Public interfaces (used by API route and sync agent) ─────────────────────
 
@@ -34,6 +35,13 @@ export interface DebtRecord {
 export interface SyncPayload {
   sales?: SaleRecord[];
   debts?: DebtRecord[];
+  /** Cash and bank ledger entries (kirim/chiqim), see lib/sync/cashflow.ts. */
+  cashFlows?: CashFlowRecord[];
+  /**
+   * Set on the last batch when the agent read the whole cash ledger from this date on:
+   * mirrored rows from that date that the run did not send are gone from 1C.
+   */
+  cashFrom?: string;
   agentVersion?: string;
   /** Same id on every batch of one agent run. */
   runId?: string;
@@ -44,6 +52,8 @@ export interface SyncPayload {
 export interface SyncResult {
   salesSynced: number;
   debtsSynced: number;
+  cashFlowsSynced: number;
+  cashFlowsSkipped: number;
   clientsCreated: number;
   clientsUpdated: number;
   errors: string[];
@@ -56,7 +66,7 @@ function genId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function normalizePhone(phone?: string): string | null {
+export function normalizePhone(phone?: string): string | null {
   if (!phone) return null;
   const d = phone.replace(/\D/g, "");
   if (d.length === 9)  return `+998${d}`;
@@ -66,8 +76,7 @@ function normalizePhone(phone?: string): string | null {
 }
 
 /** FIFO aging: oldest invoices assumed unpaid first */
-function calculateAging(totalDebt: number, invoices: DebtInvoice[]) {
-  const now = Date.now();
+export function calculateAging(totalDebt: number, invoices: DebtInvoice[], now = Date.now()) {
   const sorted = [...invoices].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -390,6 +399,7 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
   const t0 = Date.now();
   const result: SyncResult = {
     salesSynced: 0, debtsSynced: 0,
+    cashFlowsSynced: 0, cashFlowsSkipped: 0,
     clientsCreated: 0, clientsUpdated: 0,
     errors: [], durationMs: 0,
   };
@@ -425,6 +435,82 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
     }
   }
 
+  if (payload.cashFlows?.length) {
+    await syncCashFlows(payload.cashFlows, result);
+  }
+
   result.durationMs = Date.now() - t0;
   return result;
+}
+
+// ─── Cash flow (kirim / chiqim) ───────────────────────────────────────────────
+
+/** Upsert the cash/bank movements of one batch, linking customer payments to clients by INN. */
+async function syncCashFlows(records: CashFlowRecord[], result: SyncResult): Promise<void> {
+  const { rows, skipped } = toCashFlowRows(records);
+  result.cashFlowsSkipped += skipped;
+
+  const inns = [...new Set(rows.filter((r) => r.category === "CUSTOMER" && r.counterpartyInn).map((r) => r.counterpartyInn!))];
+  const clients = inns.length
+    ? await db.client.findMany({ where: { inn: { in: inns } }, select: { id: true, inn: true } })
+    : [];
+  const clientByInn = new Map(clients.map((c) => [c.inn!, c.id]));
+
+  const done: string[] = [];
+  for (const row of rows) {
+    try {
+      const data = {
+        date: new Date(row.date),
+        direction: row.direction,
+        channel: row.channel,
+        category: row.category,
+        amount: row.amount,
+        counterparty: row.counterparty,
+        counterpartyInn: row.counterpartyInn,
+        clientId: row.counterpartyInn ? clientByInn.get(row.counterpartyInn) ?? null : null,
+        debitAccount: row.debitAccount,
+        creditAccount: row.creditAccount,
+        docRef: row.docRef,
+        purpose: row.purpose,
+      };
+      await db.cashTransaction.upsert({
+        where: { externalId: row.externalId },
+        create: { externalId: row.externalId, ...data },
+        update: data,
+      });
+      done.push(row.externalId);
+      result.cashFlowsSynced++;
+    } catch (e) {
+      result.errors.push(`cash[${row.docRef}]: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // Stamped with the database clock, the same one that stamps the run's start (see removeCashFlowsMissingFromRun).
+  if (done.length) {
+    await db.$executeRaw`UPDATE cash_transactions SET "syncedAt" = NOW() WHERE "externalId" = ANY(${done}::text[])`;
+  }
+}
+
+/**
+ * Entries unposted or deleted in 1C simply stop arriving. On the final batch of a run that
+ * read the ledger from `from` on, remove mirrored rows from that date the run did not touch.
+ * Skipped unless every batch of the run fully succeeded, and unless the run sent at least
+ * one row (an empty read is more likely a broken query than an empty ledger).
+ */
+export async function removeCashFlowsMissingFromRun(runId: string, from: string): Promise<number> {
+  const runs = await db.$queryRaw<{ started: Date | null; bad: number }[]>`
+    SELECT MIN("startedAt") AS started,
+           COUNT(*) FILTER (WHERE status <> 'SUCCESS')::int AS bad
+    FROM onec_syncs WHERE "runId" = ${runId}
+  `;
+  const { started, bad } = runs[0] ?? { started: null, bad: 0 };
+  if (!started || bad > 0) return 0;
+
+  const touched = await db.cashTransaction.count({ where: { syncedAt: { gte: started } } });
+  if (touched === 0) return 0;
+
+  const removed = await db.cashTransaction.deleteMany({
+    where: { date: { gte: new Date(from) }, syncedAt: { lt: started } },
+  });
+  return removed.count;
 }

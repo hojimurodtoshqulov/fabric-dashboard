@@ -1,12 +1,13 @@
 {
   "name": "selxozmash-1c-sync-agent",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "1C Enterprise → Fabric Automation sync agent (SELXOZMASH TEXTIL)",
   "main": "index.js",
   "engines": { "node": ">=18.0.0" },
   "scripts": {
     "start": "node index.js",
-    "test-connection": "node src/test-connection.js"
+    "test-connection": "node src/test-connection.js",
+    "test-cash": "node src/test-cashflow.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

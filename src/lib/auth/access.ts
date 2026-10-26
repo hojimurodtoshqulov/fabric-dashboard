@@ -21,6 +21,7 @@ const RULES: AccessRule[] = [
   { prefix: "/hr/payroll",     read: "payroll:read" },
   { prefix: "/finance",        read: "expenses:read" },
   { prefix: "/finance/profit", read: "finance:profit" },
+  { prefix: "/finance/cashflow", read: "finance:profit" },
   { prefix: "/ai-calls",       read: "calls:read" },
   { prefix: "/messages",       read: "messages:read" },
   { prefix: "/analytics",      read: "analytics:read" },
@@ -38,6 +39,7 @@ const RULES: AccessRule[] = [
   { prefix: "/api/hr",         read: "employees:read" },
   { prefix: "/api/finance",    read: "expenses:read" },
   { prefix: "/api/finance/profit", read: "finance:profit" },
+  { prefix: "/api/finance/cashflow", read: "finance:profit" },
   { prefix: "/api/calls",      read: "calls:read" },
   { prefix: "/api/messages",   read: "messages:read" },
   { prefix: "/api/analytics",  read: "analytics:read" },
@@ -78,7 +80,7 @@ export function canOpen(role: string | undefined, pathname: string): boolean {
 // The first page a role can open is its landing page (foreman → Xodimlar, not Omborxona).
 export const NAV_PAGES = [
   "/overview", "/crm/clients", "/budget-orgs", "/sales/invoices", "/sales/debts",
-  "/hr", "/warehouse", "/hr/payroll", "/finance", "/finance/profit", "/ai-calls",
+  "/hr", "/warehouse", "/hr/payroll", "/finance", "/finance/profit", "/finance/cashflow", "/ai-calls",
   "/messages", "/analytics", "/marketing", "/website", "/tasks", "/notifications", "/settings",
 ] as const;
 

@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       status: string;
       salesCount: number;
       debtsCount: number;
+      cashFlowsCount: number;
       clientsCreated: number;
       clientsUpdated: number;
       debtsClosed: number;
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       finishedAt: Date | null;
       createdAt: Date;
     }[]>`
-      SELECT id, status, "salesCount", "debtsCount",
+      SELECT id, status, "salesCount", "debtsCount", "cashFlowsCount",
              "clientsCreated", "clientsUpdated", "debtsClosed", "runId",
              error, "startedAt", "finishedAt", "createdAt"
       FROM onec_syncs

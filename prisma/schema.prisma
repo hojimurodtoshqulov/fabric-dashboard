@@ -158,20 +158,21 @@ model Client {
   updatedAt      DateTime       @updatedAt
 
   // Relations
-  invoices       Invoice[]
-  debts          Debt[]
-  tasks          Task[]
-  calls          Call[]
-  callResponses  CallResponse[]
-  leads          Lead[]
-  debtReminders  DebtReminder[]
-  messages       Message[]
-  telegramLogs   TelegramLog[]
-  smsLogs        SMSLog[]
-  funnelEntries  FunnelEntry[]
-  stockMovements StockMovement[]
-  leadSource     LeadSource?     @relation(fields: [leadSourceId], references: [id])
-  leadSourceId   String?
+  invoices         Invoice[]
+  debts            Debt[]
+  tasks            Task[]
+  calls            Call[]
+  callResponses    CallResponse[]
+  leads            Lead[]
+  debtReminders    DebtReminder[]
+  messages         Message[]
+  telegramLogs     TelegramLog[]
+  smsLogs          SMSLog[]
+  funnelEntries    FunnelEntry[]
+  stockMovements   StockMovement[]
+  cashTransactions CashTransaction[]
+  leadSource       LeadSource?       @relation(fields: [leadSourceId], references: [id])
+  leadSourceId     String?
 
   matchesAsOneC      ClientMatchCandidate[] @relation("MatchOneC")
   matchesAsPotential ClientMatchCandidate[] @relation("MatchPotential")
@@ -1207,6 +1208,7 @@ model OneCSync {
   clientsCreated Int       @default(0)
   clientsUpdated Int       @default(0)
   debtsClosed    Int       @default(0)
+  cashFlowsCount Int       @default(0)
   runId          String?
   error          String?
   createdAt      DateTime  @default(now())
@@ -1541,4 +1543,54 @@ model Expense {
   @@index([date])
   @@index([categoryId])
   @@map("expenses")
+}
+
+// ============================================================
+// FINANCE — CASH FLOW (kassa va bank, mirrored from 1C)
+// ============================================================
+
+enum CashDirection {
+  IN
+  OUT
+}
+
+enum CashChannel {
+  CASH
+  BANK
+}
+
+enum CashCategory {
+  CUSTOMER // payment from a customer (credit 62)
+  SUPPLIER // payment to a supplier (debit 60)
+  PAYROLL // wages (debit 70)
+  TAX // taxes and social contributions (debit 68, 69)
+  EXPENSE // production / admin / sales costs (debit 20, 25, 26, 44, 71)
+  OTHER
+}
+
+/// One cash or bank movement posted in 1C. Rows are a mirror of the 1C ledger: the sync
+/// upserts them by externalId and removes the ones 1C no longer has.
+model CashTransaction {
+  id              String        @id @default(cuid())
+  externalId      String        @unique
+  date            DateTime      @db.Date
+  direction       CashDirection
+  channel         CashChannel
+  category        CashCategory
+  amount          Decimal       @db.Decimal(16, 2)
+  counterparty    String?
+  counterpartyInn String?
+  clientId        String?
+  client          Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  debitAccount    String
+  creditAccount   String
+  docRef          String
+  purpose         String?
+  syncedAt        DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  @@index([date])
+  @@index([direction, date])
+  @@index([clientId])
+  @@map("cash_transactions")
 }

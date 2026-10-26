@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, ShoppingCart, CreditCard,
   Phone, MessageSquare, BarChart3, Megaphone,
   Globe, CheckSquare, Bell, Settings, Warehouse,
-  ChevronLeft, ChevronRight, Building2, HardHat, Wallet, Receipt, PiggyBank,
+  ChevronLeft, ChevronRight, Building2, HardHat, Wallet, Receipt, PiggyBank, ArrowLeftRight,
 } from "lucide-react";
 import { canOpen } from "@/lib/auth/access";
 import { useState } from "react";
@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/hr/payroll", label: "Oylik", icon: Wallet },
   { href: "/finance", label: "Xarajatlar", icon: Receipt },
   { href: "/finance/profit", label: "Foyda hisobi", icon: PiggyBank },
+  { href: "/finance/cashflow", label: "Pul oqimi", icon: ArrowLeftRight },
   { href: "/ai-calls", label: "AI Qo'ng'iroqlar", icon: Phone },
   { href: "/messages", label: "Xabarlar", icon: MessageSquare },
   { href: "/analytics", label: "Analitika", icon: BarChart3 },
