@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # postinstall runs `prisma generate`
+      - run: npm ci
+      - name: Type check
+        run: npm run type-check
+      - name: Tests
+        run: npm test
+      # ~350 old `no-explicit-any` errors still to clean up — report them, don't block on them yet.
+      - name: Lint (informational)
+        run: npm run lint
+        continue-on-error: true
