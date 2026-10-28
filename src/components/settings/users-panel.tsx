@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Loader2, KeyRound, Ban, CheckCircle2 } from "lucide-react";
+import { UserPlus, Loader2, KeyRound, Ban, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,7 @@ export function UsersPanel({ currentUserId }: { currentUserId: string }) {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [resetFor, setResetFor] = useState<UserRow | null>(null);
+  const [loginFor, setLoginFor] = useState<UserRow | null>(null);
   const [error, setError] = useState("");
 
   const { data, isLoading } = useQuery({
@@ -85,7 +86,15 @@ export function UsersPanel({ currentUserId }: { currentUserId: string }) {
                       {u.name}{isMe && <span className="text-slate-500 text-xs"> (siz)</span>}
                       {u.phone && <p className="text-slate-500 text-xs">{u.phone}</p>}
                     </td>
-                    <td className="px-3 py-2 text-slate-300 font-mono text-xs">{u.email}</td>
+                    <td className="px-3 py-2 text-slate-300 font-mono text-xs">
+                      <span className="inline-flex items-center gap-1.5">
+                        {u.email}
+                        <button type="button" onClick={() => setLoginFor(u)} title="Loginni o'zgartirish"
+                          className="text-slate-500 hover:text-white">
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </span>
+                    </td>
                     <td className="px-3 py-2">
                       <Select
                         value={u.role.name}
@@ -145,6 +154,7 @@ export function UsersPanel({ currentUserId }: { currentUserId: string }) {
 
       <CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} />
       <ResetPasswordDialog user={resetFor} onClose={() => setResetFor(null)} />
+      <ChangeLoginDialog user={loginFor} isMe={loginFor?.id === currentUserId} onClose={() => setLoginFor(null)} />
     </div>
   );
 }
@@ -234,6 +244,48 @@ function ResetPasswordDialog({ user, onClose }: { user: UserRow | null; onClose:
           <DialogFooter>
             <Button type="submit" disabled={reset.isPending} className="bg-indigo-600 hover:bg-indigo-500">
               {reset.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChangeLoginDialog({ user, isMe, onClose }: { user: UserRow | null; isMe: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  // The field is seeded with the current login each time the dialog opens for a user
+  const [edit, setEdit] = useState<{ id: string; value: string } | null>(null);
+  const [error, setError] = useState("");
+  const login = user ? (edit?.id === user.id ? edit.value : user.email) : "";
+
+  const close = () => { setEdit(null); setError(""); onClose(); };
+  const change = useMutation({
+    mutationFn: () => send(`/api/users/${user!.id}`, "PATCH", { email: login }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["users"] }); close(); },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  return (
+    <Dialog open={user !== null} onOpenChange={(v) => { if (!v) close(); }}>
+      <DialogContent className="bg-slate-900 border-slate-800 text-white">
+        <DialogHeader><DialogTitle>Loginni o&apos;zgartirish — {user?.name}</DialogTitle></DialogHeader>
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); change.mutate(); }}>
+          <div>
+            <Label className="text-slate-400 text-sm">Yangi login yoki email</Label>
+            <Input value={login} onChange={(e) => setEdit({ id: user!.id, value: e.target.value })}
+              className="bg-slate-800 border-slate-700 mt-1" required autoFocus autoCapitalize="none" />
+            <p className="text-slate-500 text-xs mt-1">
+              {isMe
+                ? "Hozirgi sessiya davom etadi, keyingi kirishda yangi login bilan kirasiz."
+                : "Xodim keyingi kirishda yangi login bilan kiradi. Parol o'zgarmaydi."}
+            </p>
+          </div>
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <DialogFooter>
+            <Button type="submit" disabled={change.isPending || login.trim() === user?.email}
+              className="bg-indigo-600 hover:bg-indigo-500">
+              {change.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash
             </Button>
           </DialogFooter>
         </form>

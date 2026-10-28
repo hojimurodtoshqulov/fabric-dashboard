@@ -5,12 +5,12 @@ import { requirePermission, createAuditLog } from "@/lib/auth/server";
 import { apiSuccess, apiError, handleApiError } from "@/lib/utils/api";
 import { isRoleName } from "@/constants";
 
-/** Change role, block/unblock, rename, reset password. */
+/** Change login, role, block/unblock, rename, reset password. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requirePermission("users:update");
     const { id } = await params;
-    const { name, phone, role, isActive, password } = await req.json();
+    const { name, email, phone, role, isActive, password } = await req.json();
 
     const target = await db.user.findUnique({ where: { id }, include: { role: true } });
     if (!target) return apiError("Foydalanuvchi topilmadi", 404);
@@ -22,6 +22,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = String(name).trim();
+    if (email !== undefined) {
+      // The login is the email column; sign-in matches it case-insensitively, so keep it unique that way too
+      const login = String(email).trim().toLowerCase();
+      if (!login) return apiError("Login bo'sh bo'lmasin", 400);
+      if (login.length > 100 || /\s/.test(login)) return apiError("Login bo'sh joysiz, 100 belgigacha bo'lsin", 400);
+      const taken = await db.user.findFirst({
+        where: { email: { equals: login, mode: "insensitive" }, id: { not: id } },
+        select: { id: true },
+      });
+      if (taken) return apiError("Bu login band", 409);
+      if (login !== target.email) data.email = login;
+    }
     if (phone !== undefined) data.phone = phone?.trim() || null;
     if (isActive !== undefined) data.isActive = Boolean(isActive);
     if (role !== undefined) {
