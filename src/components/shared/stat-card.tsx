@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -10,6 +11,8 @@ interface StatCardProps {
   trend?: { value: number; label: string };
   color?: "indigo" | "green" | "red" | "yellow" | "blue" | "purple";
   className?: string;
+  /** Makes the whole card a link to the page behind the figure. */
+  href?: string;
 }
 
 const colorMap = {
@@ -29,13 +32,15 @@ export function StatCard({
   trend,
   color = "indigo",
   className,
+  href,
 }: StatCardProps) {
   const colors = colorMap[color];
 
-  return (
+  const card = (
     <div
       className={cn(
         "bg-slate-900 border border-slate-800 rounded-xl p-5",
+        href && "h-full transition-colors group-hover:border-slate-600 group-hover:bg-slate-800/40",
         className
       )}
     >
@@ -64,4 +69,10 @@ export function StatCard({
       </div>
     </div>
   );
+
+  return href ? (
+    <Link href={href} className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+      {card}
+    </Link>
+  ) : card;
 }
