@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { UsersPanel } from "@/components/settings/users-panel";
+import { OneCSyncPanel } from "@/components/settings/onec-sync-panel";
 import { auth } from "@/lib/auth";
 import { permissionsFor } from "@/lib/auth/access";
 
@@ -17,6 +18,7 @@ export default async function SettingsPage() {
         <p className="text-slate-400 text-sm mt-1">Tizim sozlamalari</p>
       </div>
       {canManageUsers && session && <UsersPanel currentUserId={session.user.id} />}
+      <OneCSyncPanel />
       <SettingsPanel />
     </div>
   );

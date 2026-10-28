@@ -1209,6 +1209,7 @@ model OneCSync {
   clientsUpdated Int       @default(0)
   debtsClosed    Int       @default(0)
   cashFlowsCount Int       @default(0)
+  agentVersion   String?
   runId          String?
   error          String?
   createdAt      DateTime  @default(now())
@@ -1593,4 +1594,37 @@ model CashTransaction {
   @@index([direction, date])
   @@index([clientId])
   @@map("cash_transactions")
+}
+
+// ============================================================
+// 1C SYNC — change feed (what the last syncs actually changed)
+// ============================================================
+
+enum OneCChangeKind {
+  SALE_NEW
+  SALE_CHANGED
+  DEBT_NEW
+  DEBT_CHANGED
+  DEBT_CLOSED
+  CLIENT_NEW
+  CASH_NEW
+  CASH_CHANGED
+  CASH_REMOVED
+}
+
+/// One real change the sync made. The agent re-sends everything on every run, so only
+/// differences (a new sale, a debt that moved, a payment that appeared) are recorded.
+model OneCChange {
+  id             String         @id @default(cuid())
+  kind           OneCChangeKind
+  title          String
+  ref            String?
+  detail         String?
+  amount         Decimal?       @db.Decimal(16, 2)
+  previousAmount Decimal?       @db.Decimal(16, 2)
+  clientId       String?
+  createdAt      DateTime       @default(now())
+
+  @@index([createdAt])
+  @@map("onec_changes")
 }

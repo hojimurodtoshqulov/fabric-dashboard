@@ -30,6 +30,16 @@ export async function POST(req: NextRequest) {
       VALUES (${syncId}, 'RUNNING', ${runId}, NOW(), NOW())
     `;
 
+    // Best effort, so a database that has not been migrated yet cannot break the sync itself.
+    try {
+      if (body.agentVersion) {
+        await db.$executeRaw`UPDATE onec_syncs SET "agentVersion" = ${String(body.agentVersion).slice(0, 20)} WHERE id = ${syncId}`;
+      }
+      await db.oneCChange.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
+    } catch (e) {
+      console.error("[1C] sync housekeeping failed:", e);
+    }
+
     try {
       const result = await processSyncPayload(body);
       // Record-level errors must not pass as SUCCESS: a debt that failed to update

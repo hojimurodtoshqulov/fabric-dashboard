@@ -3,6 +3,8 @@ import { detectProvince } from "@/lib/provinces";
 import { pickAutoMerge, type MatchIndex, type MatchResult, type MatchTarget } from "@/lib/clients/matching";
 import { loadMergeableIndex, loadRejectedPairs } from "@/services/crm/client-merge.service";
 import { toCashFlowRows, type CashFlowRecord } from "@/lib/sync/cashflow";
+import { sameAmount } from "@/lib/sync/onec-status";
+import type { OneCChangeKind } from "@prisma/client";
 
 // ─── Public interfaces (used by API route and sync agent) ─────────────────────
 
@@ -117,8 +119,20 @@ async function getSystemUserId(): Promise<string> {
   return fallback[0].id;
 }
 
+/** A real change made by the sync, written to the change feed shown in Settings. */
+interface PendingChange {
+  kind: OneCChangeKind;
+  title: string;
+  ref?: string | null;
+  detail?: string | null;
+  amount?: number | null;
+  previousAmount?: number | null;
+  clientId?: string | null;
+}
+
 interface SyncContext {
   systemUserId: string;
+  changes: PendingChange[];
   // Potential/new clients, loaded on first need — most batches only touch known 1C clients.
   mergeable?: MatchIndex<MatchTarget>;
   rejected?: Set<string>;
@@ -254,22 +268,31 @@ async function markBuying(clientId: string) {
 async function upsertInvoice(
   sale: SaleRecord,
   clientId: string,
-  systemUserId: string
+  ctx: SyncContext
 ): Promise<void> {
+  const systemUserId = ctx.systemUserId;
   const externalId = `1C:${sale.number}`;
   const saleDate   = new Date(sale.date);
   const dueDate    = new Date(saleDate.getTime() + 30 * 86_400_000);
 
   const existing = await db.invoice.findFirst({
     where: { externalId },
-    select: { id: true },
+    select: { id: true, total: true },
   });
 
   if (existing) {
-    await db.invoice.update({
-      where: { id: existing.id },
-      data: { subtotal: sale.amount, total: sale.amount, updatedAt: new Date() },
-    });
+    // The agent re-sends every sale on every run; only touch the row when 1C changed it.
+    const before = Number(existing.total);
+    if (!sameAmount(before, sale.amount)) {
+      await db.invoice.update({
+        where: { id: existing.id },
+        data: { subtotal: sale.amount, total: sale.amount, updatedAt: new Date() },
+      });
+      ctx.changes.push({
+        kind: "SALE_CHANGED", title: sale.clientName, ref: sale.number,
+        amount: sale.amount, previousAmount: before, clientId,
+      });
+    }
     return;
   }
 
@@ -295,9 +318,10 @@ async function upsertInvoice(
       createdAt:   saleDate,
     },
   });
+  ctx.changes.push({ kind: "SALE_NEW", title: sale.clientName, ref: sale.number, detail: sale.date, amount: sale.amount, clientId });
 }
 
-async function upsertOneCDebt(debt: DebtRecord, clientId: string): Promise<void> {
+async function upsertOneCDebt(debt: DebtRecord, clientId: string, ctx: SyncContext): Promise<void> {
   const aging = calculateAging(debt.totalDebt, debt.invoices ?? []);
 
   let status = "PENDING";
@@ -305,11 +329,17 @@ async function upsertOneCDebt(debt: DebtRecord, clientId: string): Promise<void>
   else if (aging.days31to60 + aging.days61to90 + aging.days91to100 + aging.daysOver100 > 0)
     status = "OVERDUE";
 
-  const existing = await db.$queryRaw<{ id: string }[]>`
-    SELECT id FROM debts WHERE "clientId" = ${clientId} AND "syncSource" = '1c' LIMIT 1
+  const existing = await db.$queryRaw<{ id: string; amount: number }[]>`
+    SELECT id, amount::float8 AS amount FROM debts WHERE "clientId" = ${clientId} AND "syncSource" = '1c' LIMIT 1
   `;
 
   if (existing[0]) {
+    if (!sameAmount(existing[0].amount, debt.totalDebt)) {
+      ctx.changes.push({
+        kind: "DEBT_CHANGED", title: debt.clientName,
+        amount: debt.totalDebt, previousAmount: existing[0].amount, clientId,
+      });
+    }
     await db.$executeRaw`
       UPDATE debts SET
         amount        = ${debt.totalDebt},
@@ -324,6 +354,7 @@ async function upsertOneCDebt(debt: DebtRecord, clientId: string): Promise<void>
       WHERE id = ${existing[0].id}
     `;
   } else {
+    if (debt.totalDebt > 0) ctx.changes.push({ kind: "DEBT_NEW", title: debt.clientName, amount: debt.totalDebt, clientId });
     const id = genId();
     await db.$executeRaw`
       INSERT INTO debts (
@@ -378,7 +409,7 @@ export async function closeDebtsMissingFromRun(runId: string): Promise<number> {
   const { started, bad } = runs[0] ?? { started: null, bad: 0 };
   if (!started || bad > 0) return 0;
 
-  const closed = await db.$queryRaw<{ clientId: string }[]>`
+  const closed = await db.$queryRaw<{ clientId: string; amount: number }[]>`
     UPDATE debts SET
       status       = 'PAID',
       "paidAmount" = amount,
@@ -387,9 +418,21 @@ export async function closeDebtsMissingFromRun(runId: string): Promise<number> {
     WHERE "syncSource" = '1c'
       AND status IN ('PENDING', 'PARTIAL', 'OVERDUE')
       AND ("lastSyncAt" IS NULL OR "lastSyncAt" < ${started})
-    RETURNING "clientId"
+    RETURNING "clientId", amount::float8 AS amount
   `;
   await releaseDebtors([...new Set(closed.map((r) => r.clientId))]);
+
+  if (closed.length) {
+    const names = await db.client.findMany({
+      where: { id: { in: closed.map((r) => r.clientId) } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(names.map((c) => [c.id, c.name]));
+    await saveChanges(closed.map((r) => ({
+      kind: "DEBT_CLOSED" as const, title: nameById.get(r.clientId) ?? "—",
+      amount: 0, previousAmount: r.amount, clientId: r.clientId,
+    })));
+  }
   return closed.length;
 }
 
@@ -404,15 +447,18 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
     errors: [], durationMs: 0,
   };
 
-  const ctx: SyncContext = { systemUserId: await getSystemUserId() };
+  const ctx: SyncContext = { systemUserId: await getSystemUserId(), changes: [] };
 
   for (const sale of payload.sales ?? []) {
     try {
       if (!sale.clientName || !sale.number) continue;
       const client = await findOrLinkClient(ctx, { name: sale.clientName, inn: sale.inn, phone: sale.phone });
-      if (client.created) result.clientsCreated++;
+      if (client.created) {
+        result.clientsCreated++;
+        ctx.changes.push({ kind: "CLIENT_NEW", title: sale.clientName, clientId: client.id });
+      }
       if (client.updated) result.clientsUpdated++;
-      await upsertInvoice(sale, client.id, ctx.systemUserId);
+      await upsertInvoice(sale, client.id, ctx);
       await markBuying(client.id);
       result.salesSynced++;
     } catch (e) {
@@ -426,9 +472,12 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
       const client = await findOrLinkClient(ctx, {
         name: debt.clientName, inn: debt.inn, phone: debt.phone, region: debt.region,
       });
-      if (client.created) result.clientsCreated++;
+      if (client.created) {
+        result.clientsCreated++;
+        ctx.changes.push({ kind: "CLIENT_NEW", title: debt.clientName, clientId: client.id });
+      }
       if (client.updated) result.clientsUpdated++;
-      await upsertOneCDebt(debt, client.id);
+      await upsertOneCDebt(debt, client.id, ctx);
       result.debtsSynced++;
     } catch (e) {
       result.errors.push(`debt[${debt.clientName}]: ${e instanceof Error ? e.message : e}`);
@@ -436,8 +485,10 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
   }
 
   if (payload.cashFlows?.length) {
-    await syncCashFlows(payload.cashFlows, result);
+    await syncCashFlows(payload.cashFlows, result, ctx);
   }
+
+  await saveChanges(ctx.changes);
 
   result.durationMs = Date.now() - t0;
   return result;
@@ -446,7 +497,7 @@ export async function processSyncPayload(payload: SyncPayload): Promise<SyncResu
 // ─── Cash flow (kirim / chiqim) ───────────────────────────────────────────────
 
 /** Upsert the cash/bank movements of one batch, linking customer payments to clients by INN. */
-async function syncCashFlows(records: CashFlowRecord[], result: SyncResult): Promise<void> {
+async function syncCashFlows(records: CashFlowRecord[], result: SyncResult, ctx: SyncContext): Promise<void> {
   const { rows, skipped } = toCashFlowRows(records);
   result.cashFlowsSkipped += skipped;
 
@@ -455,6 +506,15 @@ async function syncCashFlows(records: CashFlowRecord[], result: SyncResult): Pro
     ? await db.client.findMany({ where: { inn: { in: inns } }, select: { id: true, inn: true } })
     : [];
   const clientByInn = new Map(clients.map((c) => [c.inn!, c.id]));
+
+  const before = new Map(
+    (await db.cashTransaction.findMany({
+      where: { externalId: { in: rows.map((r) => r.externalId) } },
+      select: { externalId: true, amount: true },
+    })).map((r) => [r.externalId, Number(r.amount)]),
+  );
+  // The first import brings in months of history; only recent operations are news.
+  const newsFrom = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
 
   const done: string[] = [];
   for (const row of rows) {
@@ -478,6 +538,19 @@ async function syncCashFlows(records: CashFlowRecord[], result: SyncResult): Pro
         create: { externalId: row.externalId, ...data },
         update: data,
       });
+      const prev = before.get(row.externalId);
+      const news = prev === undefined ? row.date >= newsFrom : !sameAmount(prev, row.amount);
+      if (news) {
+        ctx.changes.push({
+          kind: prev === undefined ? "CASH_NEW" : "CASH_CHANGED",
+          title: row.counterparty || row.docRef,
+          ref: row.docRef,
+          detail: `${row.direction === "IN" ? "Kirim" : "Chiqim"} · ${row.channel === "CASH" ? "kassa" : "bank"}`,
+          amount: row.amount,
+          previousAmount: prev ?? null,
+          clientId: data.clientId,
+        });
+      }
       done.push(row.externalId);
       result.cashFlowsSynced++;
     } catch (e) {
@@ -512,5 +585,28 @@ export async function removeCashFlowsMissingFromRun(runId: string, from: string)
   const removed = await db.cashTransaction.deleteMany({
     where: { date: { gte: new Date(from) }, syncedAt: { lt: started } },
   });
+  if (removed.count > 0) {
+    await saveChanges([{ kind: "CASH_REMOVED", title: `${removed.count} ta yozuv 1C'dan o'chgan`, detail: `${from} dan beri` }]);
+  }
   return removed.count;
+}
+
+/** Best effort: a problem with the change feed must never fail the sync itself. */
+async function saveChanges(changes: PendingChange[]): Promise<void> {
+  if (!changes.length) return;
+  try {
+    await db.oneCChange.createMany({
+      data: changes.slice(0, 1000).map((c) => ({
+        kind: c.kind,
+        title: c.title,
+        ref: c.ref ?? null,
+        detail: c.detail ?? null,
+        amount: c.amount ?? null,
+        previousAmount: c.previousAmount ?? null,
+        clientId: c.clientId ?? null,
+      })),
+    });
+  } catch (e) {
+    console.error("[1C] could not save the change feed:", e);
+  }
 }
